@@ -1,0 +1,31 @@
+# Environment Variables
+.env
+.env.local
+*.env
+BITLOCKER_PENDRIVE.txt
+
+# Output Files (generated passwords can be large)
+generated_passwords.txt
+*.txt
+passwords_*.txt
+
+# Build artifacts
+target/
+Cargo.lock
+**/*.rs.bk
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Binary output (can be rebuilt)
+target/release/password-gen.exe
