@@ -2,6 +2,10 @@
 name = "bitunlocker"
 version = "0.1.0"
 edition = "2021"
+authors = ["rodrigoazlima"]
+license = "MIT OR Apache-2.0"
+homepage = "https://rodrigoazlima.dev"
+description = "A command-line tool for generating BitLocker password variations"
 
 [dependencies]
 
