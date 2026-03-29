@@ -32,29 +32,39 @@ cargo build --release
 
 ## Usage
 
+The CLI binary is named `password-gen`. Run it as `password-gen` (after building) or use `cargo run`.
+
 ### Template Format
 
-The password generator uses templates with customizable properties:
+Templates use placeholders with customizable properties:
 
 **Available Properties:**
 
 | Property | Description | Example |
 |----------|-------------|---------|
-| `maxSize=N` | Maximum character length | `maxSize=5` |
-| `minSize=N` | Minimum character length | `minSize=3` |
+| `min=X` | Minimum value for number/word range | `min=001` |
+| `max=Y` | Maximum value for number/word range | `max=333` |
 | `begin=name` | Start of month range (optional) | `begin=january` |
-| `end=name` | End of month range (optional) | `end=april` |
+| `end=name` | End of month range (optional) | `end=december` |
 | `leetSpeak=true\|false` | Enable leet-speak substitutions | `leetSpeak=false` |
 | `case=lower\|upper\|mixed\|all` | Case variation mode | `case=all` |
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `gen <template>` | Generate passwords from template and save to generated_passwords.txt |
+| `unlock <drive>` | Try to unlock using existing generated_passwords.txt |
+| `help` | Show help message |
 
 **Example Templates:**
 
 ```bash
 # Full month range with case variations (default leetSpeak=false)
-cargo run --release -- "{month,maxSize=5,minSize=3,begin=january,end=april,leetSpeak=false,case=all}Example{number,maxSize=3}"
+password-gen gen "{month,min=1,max=3,begin=january,end=april,leetSpeak=false,case=all}Example{number,min=001,max=999}"
 
 # With leet-speak enabled
-cargo run --release -- "{word,maxSize=4,minSize=2,leetSpeak=true,case=mixed}{number,maxSize=2}"
+password-gen gen "{word,min=1,max=6,leetSpeak=true,case=mixed}{number,min=00,max=99}"
 ```
 
 This generates passwords like:
@@ -65,7 +75,7 @@ This generates passwords like:
 ### Basic Usage
 
 ```bash
-cargo run --release -- "{word,maxSize=5}Example{number,maxSize=3}"
+password-gen gen "{word}Example{number,min=001,max=999}"
 ```
 
 Output is saved to `generated_passwords.txt`.
@@ -90,7 +100,7 @@ If your pendrive is at D: and uses BitLocker:
 
 1. First generate passwords:
    ```bash
-   cargo run --release -- "{month,maxSize=5,begin=january,end=april,case=all}Example{number,maxSize=3}"
+   password-gen gen "{month,min=1,max=5,begin=january,end=april,case=all}Example{number,min=001,max=999}"
    ```
 
 2. The password list will be in `generated_passwords.txt`
@@ -101,19 +111,19 @@ If your pendrive is at D: and uses BitLocker:
 
 ### Month Range with All Case Variations
 ```bash
-cargo run --release -- "{month,maxSize=5,begin=january,end=december,case=all}Example{number,maxSize=3}"
+password-gen gen "{month,min=1,max=5,begin=january,end=december,case=all}Example{number,min=001,max=999}"
 ```
 
 ### With Leet-Speak Enabled
 ```bash
-cargo run --release -- "{word,maxSize=6,leetSpeak=true,case=mixed}{year,maxSize=4}"
+password-gen gen "{word,min=1,max=6,leetSpeak=true,case=mixed}{year,min=1990,max=2030}"
 ```
 
 ### Simple Pattern with Numbers
 ```bash
-cargo run --release -- "Password{number,maxSize=3}"
+password-gen gen "Password{number,min=001,max=999}"
 ```
-Generates: `Password000`, `Password001`, ..., `Password999`
+Generates: `Password001`, `Password002`, ..., `Password999`
 
 ## Output
 
@@ -143,7 +153,7 @@ When enabled, the tool automatically generates common leet-speak variations:
 ## Performance Notes
 
 - The output file can be very large (hundreds of thousands of passwords)
-- Use appropriate `maxSize` and `minSize` values to limit the search space
+- Use appropriate `min` and `max` values to limit the search space
 - The month range (`begin-end`) helps reduce unnecessary combinations
 
 ## Author
