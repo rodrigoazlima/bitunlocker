@@ -4,37 +4,6 @@ pub fn get_month_order() -> Vec<&'static str> {
          "july", "august", "september", "october", "november", "december"]
 }
 
-/// Generate month range from begin to end (inclusive)
-pub fn generate_month_range(begin: &str, end: &str) -> Vec<String> {
-    let months = get_month_order();
-    let begin_lower = begin.to_lowercase();
-    let end_lower = end.to_lowercase();
-    
-    let start_idx = months.iter().position(|m| m == &begin_lower);
-    let end_idx = months.iter().position(|m| m == &end_lower);
-    
-    if let (Some(s), Some(e)) = (start_idx, end_idx) {
-        let mut range = Vec::new();
-        for i in s..=e {
-            range.push(months[i].to_string());
-            // Also add capitalized version
-            let cap: String = months[i].chars().next().unwrap().to_uppercase().collect::<String>() + &months[i][1..];
-            if cap != months[i] {
-                range.push(cap);
-            }
-        }
-        range
-    } else {
-        // Fallback to all months if parsing fails
-        let mut result = Vec::new();
-        for m in months {
-            result.push(m.to_string());
-            let cap: String = m.chars().next().unwrap().to_uppercase().collect::<String>() + &m[1..];
-            result.push(cap);
-        }
-        result
-    }
-}
 
 #[cfg(test)]
 mod tests {

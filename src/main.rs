@@ -224,38 +224,6 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
     }
 }
 
-#[allow(dead_code)]
-/// Generate all combinations (Cartesian product) from lists of values
-fn generate_combinations(values: &[Vec<String>]) -> Vec<String> {
-    if values.is_empty() {
-        return vec!["".to_string()];
-    }
-    
-    let mut results = Vec::new();
-    let mut current = Vec::with_capacity(values.len());
-    
-    fn backtrack(
-        values: &[Vec<String>],
-        index: usize,
-        current: &mut Vec<String>,
-        results: &mut Vec<String>,
-    ) {
-        if index == values.len() {
-            results.push(current.concat());
-            return;
-        }
-        
-        for value in &values[index] {
-            current.push(value.clone());
-            backtrack(values, index + 1, current, results);
-            current.pop();
-        }
-    }
-    
-    backtrack(values, 0, &mut current, &mut results);
-    results
-}
-
 fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: bool) {
     let passwords = if let Some(file) = passwords_file {
         match std::fs::read_to_string(file) {

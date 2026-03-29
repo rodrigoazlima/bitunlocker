@@ -58,12 +58,6 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
     }
 }
 
-/// Generate word range (alphabetical or numeric)
-fn generate_word_range(_begin: &str, _end: &str) -> Vec<String> {
-    // For non-numeric, just return the begin value as a single word
-    vec![_begin.to_string()]
-}
-
 /// Generate all combinations (Cartesian product) from lists of values
 fn generate_combinations(values: &[Vec<String>]) -> Vec<String> {
     if values.is_empty() {
