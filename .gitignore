@@ -2,7 +2,7 @@
 .env
 .env.local
 *.env
-BITLOCKER_PENDRIVE.txt
+BITLOCKER_DRIVE.txt
 
 # Output Files (generated passwords can be large)
 generated_passwords.txt

@@ -84,13 +84,13 @@ Output is saved to `generated_passwords.txt`.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `BITLOCKER_PENDRIVE` | Target drive path for BitLocker recovery | `D:\` |
+| `BITLOCKER_DRIVE` | Target drive path for BitLocker recovery | `D:\` |
 | `OUTPUT_PASSWORD_FILE` | Output file path for generated passwords | `C:\passwords.txt` |
 
 ### Setting Environment Variables (Windows)
 
 ```cmd
-set BITLOCKER_PENDRIVE=D:\
+set BITLOCKER_DRIVE=D:\
 set OUTPUT_PASSWORD_FILE=C:\passwords.txt
 ```
 
