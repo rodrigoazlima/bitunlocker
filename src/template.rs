@@ -1,15 +1,15 @@
 /// Template part with all customizable properties
 pub struct TemplatePart {
     pub kind: String,
-    pub min_size: usize,
-    pub max_size: usize,
-    pub begin: Option<String>,
-    pub end: Option<String>,
+    pub begin_value: Option<String>,
+    pub end_value: Option<String>,
+    pub min_value: Option<String>,
+    pub max_value: Option<String>,
     pub leet_speak: bool,
     pub case_mode: String,
 }
 
-/// Parse template like {month,maxSize=5,minSize=3,begin=january,end=april,leetSpeak=false,case=all}
+/// Parse template like "prefix{number,min=001,max=333}suffix"
 pub fn parse_template(template: &str) -> Vec<TemplatePart> {
     let mut parts = Vec::new();
     let chars: Vec<char> = template.chars().collect();
@@ -48,20 +48,20 @@ pub fn parse_template(template: &str) -> Vec<TemplatePart> {
     parts
 }
 
-/// Parse a single placeholder like {month,maxSize=5,minSize=3,begin=january,end=april}
+/// Parse a single placeholder like {number,min=001,max=333}
 pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
     let mut kind = String::new();
-    let mut min_size = 1;
-    let mut max_size = 5;
-    let mut begin = None;
-    let mut end = None;
+    let mut begin_value = None;
+    let mut end_value = None;
+    let mut min_value = None;
+    let mut max_value = None;
     let mut leet_speak = false;
     let mut case_mode = "mixed".to_string();
     
     // Remove braces
     let content = placeholder.trim_start_matches('{').trim_end_matches('}');
     
-    // If there are no key=value pairs, the entire content is the kind (e.g., "month", "number", or "word")
+    // If there are no key=value pairs, the entire content is the kind
     if !content.contains('=') {
         let trimmed = content.trim();
         match trimmed {
@@ -70,10 +70,10 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
         }
         return TemplatePart {
             kind,
-            min_size,
-            max_size,
-            begin,
-            end,
+            begin_value,
+            end_value,
+            min_value,
+            max_value,
             leet_speak,
             case_mode,
         };
@@ -87,26 +87,29 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
             let value = key_val[1].trim();
             
             match key {
-                "word" | "month" => kind = key.to_string(),
-                "minSize" => min_size = value.parse().unwrap_or(1),
-                "maxSize" => max_size = value.parse().unwrap_or(5),
-                "begin" => begin = Some(value.to_lowercase()),
-                "end" => end = Some(value.to_lowercase()),
+                "word" | "month" | "number" => kind = key.to_string(),
+                "begin" | "beginValue" => begin_value = Some(value.to_string()),
+                "end" | "endValue" => end_value = Some(value.to_string()),
+                "min" | "minValue" => min_value = Some(value.to_string()),
+                "max" | "maxValue" => max_value = Some(value.to_string()),
                 "leetSpeak" => leet_speak = value.to_lowercase() == "true",
                 "case" => case_mode = value.to_lowercase(),
                 _ => {}
             }
-        } else if part.trim().contains("word") || part.trim().contains("month") {
+        } else if part.trim().contains("word") 
+            || part.trim().contains("month") 
+            || part.trim().contains("number")
+            || part.trim().contains("year") {
             kind = part.trim().to_string();
         }
     }
     
     TemplatePart {
         kind,
-        min_size,
-        max_size,
-        begin,
-        end,
+        begin_value,
+        end_value,
+        min_value,
+        max_value,
         leet_speak,
         case_mode,
     }
@@ -126,47 +129,35 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_template_with_parameters() {
-        let template = "{month,maxSize=5,minSize=3,begin=january,end=april}";
+    fn test_parse_template_with_min_max() {
+        let template = "{number,min=001,max=333}";
         let parts = parse_template(template);
         
         assert_eq!(parts.len(), 1);
         let part = &parts[0];
-        assert_eq!(part.kind, "month");
-        assert_eq!(part.max_size, 5);
-        assert_eq!(part.min_size, 3);
-        assert_eq!(part.begin, Some("january".to_string()));
-        assert_eq!(part.end, Some("april".to_string()));
+        assert_eq!(part.kind, "number");
+        assert_eq!(part.min_value, Some("001".to_string()));
+        assert_eq!(part.max_value, Some("333".to_string()));
     }
 
     #[test]
-    fn test_parse_template_multiple_parts() {
-        let template = "{month}Example{number}";
+    fn test_parse_template_with_prefix_suffix() {
+        let template = "prefix{number,min=001,max=333}suffix";
         let parts = parse_template(template);
         
-        assert_eq!(parts.len(), 2);
-        assert_eq!(parts[0].kind, "month");
-        assert_eq!(parts[1].kind, "number");
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0].kind, "number");
     }
 
     #[test]
     fn test_parse_placeholder_with_all_options() {
-        let placeholder = "{word,maxSize=4,minSize=2,leetSpeak=true,case=all}";
+        let placeholder = "{word,min=aaa,max=zzz,leetSpeak=true,case=all}";
         let part = parse_placeholder(placeholder);
         
         assert_eq!(part.kind, "word");
-        assert_eq!(part.max_size, 4);
-        assert_eq!(part.min_size, 2);
+        assert_eq!(part.min_value, Some("aaa".to_string()));
+        assert_eq!(part.max_value, Some("zzz".to_string()));
         assert!(part.leet_speak);
         assert_eq!(part.case_mode, "all");
-    }
-
-    #[test]
-    fn test_parse_placeholder_with_month_keyword() {
-        let placeholder = "{month,maxSize=3}";
-        let part = parse_placeholder(placeholder);
-        
-        assert_eq!(part.kind, "month");
-        assert_eq!(part.max_size, 3);
     }
 }

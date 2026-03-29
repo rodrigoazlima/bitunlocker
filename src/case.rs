@@ -1,43 +1,43 @@
 use std::collections::HashSet;
 
+/// Generate all possible case combinations for a word (2^N combinations)
+fn gen_all_cases_recursive(chars: &[char], current: String, results: &mut HashSet<String>) {
+    if chars.is_empty() {
+        results.insert(current);
+        return;
+    }
+    
+    let c = chars[0];
+    let lower_c = c.to_ascii_lowercase();
+    let upper_c = c.to_ascii_uppercase();
+    
+    // Add lowercase version
+    gen_all_cases_recursive(&chars[1..], format!("{}{}", current, lower_c), results);
+    
+    // Add uppercase version if different from lowercase
+    if lower_c != upper_c {
+        gen_all_cases_recursive(&chars[1..], format!("{}{}", current, upper_c), results);
+    }
+}
+
 /// Generate case variations based on case parameter
 pub fn generate_case_variations(word: &str, case_mode: &str) -> HashSet<String> {
     let mut variations = HashSet::new();
-    variations.insert(word.to_lowercase());
-    variations.insert(word.to_uppercase());
-    variations.insert({
-        let mut s = word.to_string();
-        if !s.is_empty() {
-            let first = s.chars().next().unwrap().to_uppercase().collect::<String>();
-            s = first + &word[1..];
-        }
-        s
-    });
     
     if case_mode == "all" {
-        // Generate all combinations - for short words only (2^N possibilities)
-        if word.len() <= 4 {
-            fn gen_all_cases(
-                chars: &[char],
-                current: String,
-                results: &mut HashSet<String>,
-            ) {
-                if chars.is_empty() {
-                    results.insert(current);
-                    return;
-                }
-                let c = chars[0];
-                let lower_c = c.to_ascii_lowercase();
-                let upper_c = c.to_ascii_uppercase();
-                
-                gen_all_cases(&chars[1..], format!("{}{}", current, lower_c), results);
-                if lower_c != upper_c {
-                    gen_all_cases(&chars[1..], format!("{}{}", current, upper_c), results);
-                }
-            }
-            let chars: Vec<char> = word.chars().collect();
-            gen_all_cases(&chars, String::new(), &mut variations);
+        // Generate all 2^N combinations for any word length
+        gen_all_cases_recursive(&word.chars().collect::<Vec<_>>(), String::new(), &mut variations);
+    } else {
+        // Default: lowercase, uppercase, titlecase
+        variations.insert(word.to_lowercase());
+        variations.insert(word.to_uppercase());
+        
+        let mut title_case = word.to_string();
+        if !title_case.is_empty() {
+            let first = title_case.chars().next().unwrap().to_uppercase().collect::<String>();
+            title_case = first + &word[1..];
         }
+        variations.insert(title_case);
     }
     
     variations
@@ -69,13 +69,15 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_case_variations_all_mode_long_word() {
-        // For words longer than 4 characters, all mode should only do default cases
-        let variations = generate_case_variations("hello", "all");
+    fn test_generate_case_variations_all_mode_february() {
+        // For "february" (8 chars): 2^8 = 256 combinations
+        let variations = generate_case_variations("february", "all");
         
-        assert!(variations.contains(&"hello".to_string()));
-        assert!(variations.contains(&"HELLO".to_string()));
-        assert!(variations.contains(&"Hello".to_string()));
+        assert_eq!(variations.len(), 256);
+        assert!(variations.contains(&"february".to_string()));
+        assert!(variations.contains(&"FEBRUARY".to_string()));
+        assert!(variations.contains(&"February".to_string()));
+        assert!(variations.contains(&"FeBrUaRy".to_string()));
     }
 
     #[test]

@@ -1,14 +1,23 @@
 use std::collections::HashSet;
 
-/// Generate numbers from 0 to max_value with specified min/max sizes
-pub fn generate_numbers(_min_size: usize, max_size: usize) -> Vec<String> {
+/// Generate a range of numbers from begin to end (inclusive)
+/// Supports zero-padded numbers like "001" to "333"
+pub fn generate_number_range(begin: &str, end: &str) -> Vec<String> {
+    let begin_val = begin.parse::<i64>().unwrap_or(0);
+    let end_val = end.parse::<i64>().unwrap_or(0);
+    
     let mut numbers = Vec::new();
     
-    // Always use 3-digit padding for consistency (000-999)
-    match max_size {
-        1 => for i in 0..=9 { numbers.push(format!("{:03}", i)); },
-        2 => for i in 0..=99 { numbers.push(format!("{:03}", i)); },
-        _ => for i in 0..=999 { numbers.push(format!("{:03}", i)); },
+    // Determine padding from the begin value (count digits including leading zeros)
+    let padding = begin.len();
+    
+    for i in begin_val..=end_val {
+        let num_str = if padding > 0 {
+            format!("{:0padding$}", i, padding = padding)
+        } else {
+            i.to_string()
+        };
+        numbers.push(num_str);
     }
     
     // Remove duplicates
@@ -23,26 +32,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_numbers_max_size_1() {
-        let numbers = generate_numbers(1, 1);
-        assert_eq!(numbers.len(), 10);
-        assert!(numbers.contains(&"000".to_string()));
-        assert!(numbers.contains(&"009".to_string()));
+    fn test_generate_number_range_basic() {
+        let nums = generate_number_range("1", "5");
+        assert_eq!(nums.len(), 5);
+        assert_eq!(nums[0], "1");
+        assert_eq!(nums[4], "5");
     }
 
     #[test]
-    fn test_generate_numbers_max_size_2() {
-        let numbers = generate_numbers(1, 2);
-        assert_eq!(numbers.len(), 100);
-        assert!(numbers.contains(&"000".to_string()));
-        assert!(numbers.contains(&"099".to_string()));
+    fn test_generate_number_range_with_padding() {
+        let nums = generate_number_range("001", "005");
+        assert_eq!(nums.len(), 5);
+        assert_eq!(nums[0], "001");
+        assert_eq!(nums[4], "005");
     }
 
     #[test]
-    fn test_generate_numbers_max_size_3() {
-        let numbers = generate_numbers(1, 3);
-        assert_eq!(numbers.len(), 1000);
-        assert!(numbers.contains(&"000".to_string()));
-        assert!(numbers.contains(&"999".to_string()));
+    fn test_generate_number_range_large() {
+        let nums = generate_number_range("1991", "2000");
+        assert_eq!(nums.len(), 10);
+        assert_eq!(nums[0], "1991");
+        assert_eq!(nums[4], "1995");
+        assert_eq!(nums[9], "2000");
     }
 }
