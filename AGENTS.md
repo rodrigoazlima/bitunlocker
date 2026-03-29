@@ -1,7 +1,7 @@
 # Cline Rules for Rust Project - bitunlocker
 
 ## RULE: NO DEAD CODE
-- All functions must be called or exported. Unused: remove or add `#[allow(dead_code)]` + comment.
+- All functions must be called or exported. Unused: remove it. Do not use `#[allow(dead_code)]`.
 - Tests allowed only under `#[cfg(test)]`.
 - Modules in `lib.rs`/`main.rs` must export at least one used item.
 - All imports must be used (`_` prefix for intentional unused).
