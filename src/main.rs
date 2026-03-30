@@ -9,7 +9,7 @@ mod numbers;
 mod template;
 mod unlock;
 
-use crate::{template::parse_template, unlock::brute_force_unlock};
+use crate::{template::parse_template, unlock::{brute_force_unlock, UnlockResult}};
 
 fn print_usage() {
     println!("Usage: bitunlocker <command> [options]");
@@ -246,7 +246,7 @@ pub fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> 
     }
 }
 
-fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: bool) {
+fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: bool, stop_after_first: bool) -> UnlockResult {
     let passwords = if let Some(file) = passwords_file {
         match std::fs::read_to_string(file) {
             Ok(content) => content.lines().map(|s| s.to_string()).collect(),
@@ -266,15 +266,8 @@ fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: boo
         }
     };
 
-    match brute_force_unlock(drive, passwords, use_ps) {
-        Ok(Some(password)) => {
-            println!("\nBitLocker unlocked successfully!");
-            println!("Recovery Password: {}", password);
-        }
-        Ok(None) => {
-            eprintln!("\nFailed to unlock drive with provided passwords.");
-            std::process::exit(1);
-        }
+    match brute_force_unlock(drive, passwords, use_ps, stop_after_first) {
+        Ok(result) => result,
         Err(e) => {
             eprintln!("Error during unlock attempt: {}", e);
             std::process::exit(1);
@@ -323,9 +316,9 @@ fn main() {
 
             generate_and_save_passwords(template, "generated_passwords.txt");
 
-            // If --unlock was specified, run unlock after generation
+            // If --unlock was specified, run unlock after generation (test all passwords)
             if let Some(drive) = unlock_drive {
-                unlock_drive_from_file(drive, None, true);
+                unlock_drive_from_file(drive, None, true, false); // stop_after_first = false to test all
             }
         }
 
@@ -356,7 +349,7 @@ fn main() {
                 }
             }
 
-            unlock_drive_from_file(drive, passwords_file.map(|x| x.as_str()), use_ps);
+            unlock_drive_from_file(drive, passwords_file.map(|x| x.as_str()), use_ps, true); // stop_after_first = true for default unlock
         }
 
         "help" | "-h" | "--help" => {
