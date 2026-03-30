@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 
 mod case;
+mod cache;
 mod leet;
 mod months;
 mod numbers;
@@ -26,10 +27,16 @@ fn print_usage() {
     println!("  {{number,min=X,max=Y}} - Number range with optional padding");
     println!("  {{word,min=X,max=Y}}   - Word value or range");
     println!("  {{month}}              - Month names (january-december)");
+    println!("\nOptions:");
+    println!("  --unlock D:           Attempt to unlock drive after generation");
+    println!("  --passwords <file>    Use custom password file for unlock");
+    println!("  --no-powershell       Use manage-bde.exe instead of PowerShell");
+    println!("  --no-cache            Disable device-specific password cache (enabled by default)");
     println!("\nExamples:");
     println!("  bitunlocker gen \"pass{{number,min=001,max=333}}\" --unlock D:");
     println!("  bitunlocker gen \"{{word}}{{year,min=1990,max=2030}}\"");
     println!("  bitunlocker unlock D: --passwords my_passwords.txt");
+    println!("  bitunlocker unlock D: --no-cache"); // Disable cache
 }
 
 pub fn generate_and_save_passwords(template: &str, output_file: &str) {
@@ -246,7 +253,7 @@ pub fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> 
     }
 }
 
-fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: bool, stop_after_first: bool) -> UnlockResult {
+fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: bool, stop_after_first: bool, use_cache: bool) -> UnlockResult {
     let passwords = if let Some(file) = passwords_file {
         match std::fs::read_to_string(file) {
             Ok(content) => content.lines().map(|s| s.to_string()).collect(),
@@ -266,7 +273,7 @@ fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: boo
         }
     };
 
-    match brute_force_unlock(drive, passwords, use_ps, stop_after_first) {
+    match brute_force_unlock(drive, passwords, use_ps, stop_after_first, use_cache) {
         Ok(result) => result,
         Err(e) => {
             eprintln!("Error during unlock attempt: {}", e);
@@ -295,7 +302,7 @@ fn main() {
 
             let template = &args[2];
             let mut unlock_drive = None;
-            let _test_mode = false; // Placeholder for potential future test mode
+            let mut use_cache = true; // Cache is enabled by default
 
             // Parse additional arguments for --unlock and other options
             let mut i = 3;
@@ -309,6 +316,9 @@ fn main() {
                 } else if args[i] == "--no-powershell" {
                     // Note: This flag is not used in gen mode, only unlock mode
                     i += 1;
+                } else if args[i] == "--no-cache" {
+                    use_cache = false;
+                    i += 1;
                 } else {
                     i += 1;
                 }
@@ -318,7 +328,7 @@ fn main() {
 
             // If --unlock was specified, run unlock after generation (test all passwords)
             if let Some(drive) = unlock_drive {
-                unlock_drive_from_file(drive, None, true, false); // stop_after_first = false to test all
+                unlock_drive_from_file(drive, None, true, false, use_cache); // stop_after_first = false to test all
             }
         }
 
@@ -332,6 +342,7 @@ fn main() {
             let mut drive = &args[2];
             let mut passwords_file = None;
             let mut use_ps = true;
+            let mut use_cache = true; // Cache is enabled by default
 
             let mut i = 3;
             while i < args.len() {
@@ -341,6 +352,9 @@ fn main() {
                 } else if args[i] == "--no-powershell" {
                     use_ps = false;
                     i += 1;
+                } else if args[i] == "--no-cache" {
+                    use_cache = false;
+                    i += 1;
                 } else if !args[i].starts_with('-') {
                     drive = &args[i];
                     i += 1;
@@ -349,7 +363,7 @@ fn main() {
                 }
             }
 
-            unlock_drive_from_file(drive, passwords_file.map(|x| x.as_str()), use_ps, true); // stop_after_first = true for default unlock
+            unlock_drive_from_file(drive, passwords_file.map(|x| x.as_str()), use_ps, true, use_cache); // stop_after_first = true for default unlock
         }
 
         "help" | "-h" | "--help" => {
