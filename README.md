@@ -116,7 +116,7 @@ password-gen gen "{month,min=1,max=5,begin=january,end=december,case=all}Example
 
 ### With Leet-Speak Enabled
 ```bash
-password-gen gen "{word,min=1,max=6,leetSpeak=true,case=mixed}{year,min=1990,max=2030}"
+password-gen gen "{word,min=1,max=6,leetSpeak=true,case=mixed}{number,min=1990,max=2030}"
 ```
 
 ### Simple Pattern with Numbers
