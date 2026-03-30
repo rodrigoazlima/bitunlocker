@@ -1,5 +1,5 @@
 //! Password Generator Library
-//! 
+//!
 //! This library provides password generation functionality based on templates.
 
 pub mod case;
@@ -11,10 +11,10 @@ pub mod template;
 pub mod unlock;
 
 // Re-export commonly used functions from the main module
-pub use months::{get_month_order, generate_month_range};
-pub use numbers::generate_number_range;
-pub use leet::{get_leet_map, apply_leet_variations};
+// Removed generate_month_range re-export as it's unused
 pub use case::generate_case_variations;
-pub use template::{TemplatePart, parse_template, parse_placeholder};
-pub use generator::generate_passwords_from_parts;
-pub use unlock::{try_unlock_drive, try_unlock_drive_ps, brute_force_unlock};
+pub use generator::{generate_combinations, generate_passwords_from_parts};
+pub use leet::{apply_leet_variations, get_leet_map};
+pub use numbers::generate_number_range;
+pub use template::{parse_placeholder, parse_template, TemplatePart};
+pub use unlock::{brute_force_unlock, try_unlock_drive, try_unlock_drive_ps};

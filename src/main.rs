@@ -9,16 +9,15 @@ mod numbers;
 mod template;
 mod unlock;
 
-use crate::{
-    template::parse_template,
-    unlock::brute_force_unlock,
-};
+use crate::{template::parse_template, unlock::brute_force_unlock};
 
 fn print_usage() {
     println!("Usage: bitunlocker <command> [options]");
     println!("\nCommands:");
     println!("  gen <template>        Generate passwords from template and save to generated_passwords.txt");
-    println!("                        (use --unlock D: to also attempt unlock, --test to validate)");
+    println!(
+        "                        (use --unlock D: to also attempt unlock, --test to validate)"
+    );
     println!("  test <file>           Validate password file against expected patterns");
     println!("  unlock <drive>        Try to unlock using existing generated_passwords.txt");
     println!("                        (or use --passwords <file> for custom list)");
@@ -33,15 +32,16 @@ fn print_usage() {
     println!("  bitunlocker unlock D: --passwords my_passwords.txt");
 }
 
-fn generate_and_save_passwords(template: &str, output_file: &str) {
+pub fn generate_and_save_passwords(template: &str, output_file: &str) {
     let parts = parse_template(template);
-    
+
     if parts.is_empty() {
         // No placeholders - just one literal password
         match File::create(output_file) {
             Ok(f) => {
                 let mut writer = BufWriter::new(f);
-                writeln!(writer, "{}", template).unwrap();
+                // Panic message if file write fails (should not happen since we already created the file)
+                writeln!(writer, "{}", template).expect("failed to write single password to file");
                 println!("Generated 1 password to {}", output_file);
             }
             Err(e) => {
@@ -51,11 +51,11 @@ fn generate_and_save_passwords(template: &str, output_file: &str) {
         }
         return;
     }
-    
+
     // Extract literal text segments between placeholders
     let mut literal_segments = Vec::new();
     let mut current_pos = 0;
-    
+
     for _part in &parts {
         if let Some(start) = template[current_pos..].find('{') {
             // Literal text before this placeholder
@@ -74,70 +74,74 @@ fn generate_and_save_passwords(template: &str, output_file: &str) {
             break;
         }
     }
-    
+
     // Collect values for each placeholder
     let mut values_by_part = Vec::new();
-    
+
     for _part in &parts {
         let values = get_values_for_part(_part);
         values_by_part.push(values);
     }
-    
+
     // Generate passwords using Cartesian product with literals
     let passwords = generate_combinations_with_literals(&literal_segments, &values_by_part);
-    
+
     // Remove duplicates and sort
     let mut unique_passwords: Vec<String> = passwords.into_iter().collect();
     unique_passwords.sort();
     unique_passwords.dedup();
-    
+
     // Write to output file
     match File::create(output_file) {
         Ok(f) => {
             let mut writer = BufWriter::new(f);
             for pwd in &unique_passwords {
-                writeln!(writer, "{}", pwd).unwrap();
+                // Panic message if file write fails (should not happen since we already created the file)
+                writeln!(writer, "{}", pwd).expect("failed to write password to file");
             }
-            println!("Generated {} passwords to {}", unique_passwords.len(), output_file);
+            println!(
+                "Generated {} passwords to {}",
+                unique_passwords.len(),
+                output_file
+            );
         }
         Err(e) => {
             eprintln!("Error writing file: {}", e);
             std::process::exit(1);
         }
     }
-    
 }
 
 /// Generate passwords with literal prefixes/suffixes
-fn generate_combinations_with_literals(
+pub fn generate_combinations_with_literals(
     literals: &[String],
     values_by_part: &[Vec<String>],
 ) -> Vec<String> {
     if values_by_part.is_empty() {
         return vec![literals.join("")];
     }
-    
+
     let mut results = Vec::new();
-    
+
     // For each value in the first placeholder
     for value in &values_by_part[0] {
         // Combine literals with this value and recursively process remaining
         let mut prefix = String::new();
-        
-        if !literals.is_empty() && values_by_part.len() >= 1 {
+
+        if !literals.is_empty() && !values_by_part.is_empty() {
             // Add literal before first placeholder
             prefix.push_str(&literals[0]);
         }
-        
+
         prefix.push_str(value);
-        
+
         if literals.len() > 1 && values_by_part.len() > 1 {
             // Add literal between placeholders
             prefix.push_str(&literals[1..].join(""));
         }
-        
+
         let remaining_values: Vec<Vec<String>> = values_by_part.iter().skip(1).cloned().collect();
-        
+
         if remaining_values.is_empty() {
             results.push(prefix);
         } else {
@@ -148,16 +152,24 @@ fn generate_combinations_with_literals(
             }
         }
     }
-    
+
     results
 }
 
-fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
+pub fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
     // If min/max are provided and kind is not word/month, treat as number range
     if let (Some(_begin), Some(_end)) = (&part.min_value, &part.max_value) {
-        return crate::numbers::generate_number_range(part.min_value.as_ref().unwrap(), part.max_value.as_ref().unwrap());
+        // Safety: We already checked that min_value and max_value are Some in the pattern match
+        return crate::numbers::generate_number_range(
+            part.min_value
+                .as_ref()
+                .expect("min_value is Some after pattern match"),
+            part.max_value
+                .as_ref()
+                .expect("max_value is Some after pattern match"),
+        );
     }
-    
+
     match part.kind.as_str() {
         "number" => {
             // Default: generate 0-99
@@ -168,45 +180,55 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
         }
         "month" => {
             let all_months = crate::months::get_month_order();
-            
+
             // Get the begin and end indices for filtering
             let mut start_idx = 0;
             let mut end_idx = all_months.len() - 1;
-            
+
             if let Some(begin) = &part.begin_value {
-                if let Some(idx) = all_months.iter().position(|m| m.to_lowercase() == begin.to_lowercase()) {
+                if let Some(idx) = all_months
+                    .iter()
+                    .position(|m| m.to_lowercase() == begin.to_lowercase())
+                {
                     start_idx = idx;
                 }
             }
-            
+
             if let Some(end) = &part.end_value {
-                if let Some(idx) = all_months.iter().position(|m| m.to_lowercase() == end.to_lowercase()) {
+                if let Some(idx) = all_months
+                    .iter()
+                    .position(|m| m.to_lowercase() == end.to_lowercase())
+                {
                     end_idx = idx;
                 }
             }
-            
+
             // Generate months in the range
             let mut results = Vec::new();
-            
+
             for month in &all_months[start_idx..=end_idx] {
                 let cases = crate::case::generate_case_variations(month, &part.case_mode);
                 for case in cases {
                     if part.leet_speak {
-                        let leet_cases = crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
+                        let leet_cases =
+                            crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
                         results.extend(leet_cases);
                     } else {
                         results.push(case);
                     }
                 }
             }
-            
+
             // If begin/end not found or invalid range, return all months with case variations
             if results.is_empty() {
                 for month in &all_months {
                     let cases = crate::case::generate_case_variations(month, &part.case_mode);
                     for case in cases {
                         if part.leet_speak {
-                            let leet_cases = crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
+                            let leet_cases = crate::leet::apply_leet_variations(
+                                &case,
+                                &crate::leet::get_leet_map(),
+                            );
                             results.extend(leet_cases);
                         } else {
                             results.push(case);
@@ -214,7 +236,7 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
                     }
                 }
             }
-            
+
             results
         }
         _ => {
@@ -243,7 +265,7 @@ fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: boo
             }
         }
     };
-    
+
     match brute_force_unlock(drive, passwords, use_ps) {
         Ok(Some(password)) => {
             println!("\nBitLocker unlocked successfully!");
@@ -262,14 +284,14 @@ fn unlock_drive_from_file(drive: &str, passwords_file: Option<&str>, use_ps: boo
 
 fn main() {
     let args: Vec<String> = args().collect();
-    
+
     if args.len() < 2 {
         print_usage();
         std::process::exit(1);
     }
-    
+
     let command = &args[1];
-    
+
     match command.as_str() {
         "gen" | "generate" => {
             if args.len() < 3 {
@@ -277,11 +299,11 @@ fn main() {
                 println!("\nUsage: bitunlocker gen <template>");
                 std::process::exit(1);
             }
-            
+
             let template = &args[2];
             let mut unlock_drive = None;
             let _test_mode = false; // Placeholder for potential future test mode
-            
+
             // Parse additional arguments for --unlock and other options
             let mut i = 3;
             while i < args.len() {
@@ -292,31 +314,32 @@ fn main() {
                     // Handle --passwords for custom file (not used with gen, but allowed)
                     i += 2;
                 } else if args[i] == "--no-powershell" {
+                    // Note: This flag is not used in gen mode, only unlock mode
                     i += 1;
                 } else {
                     i += 1;
                 }
             }
-            
+
             generate_and_save_passwords(template, "generated_passwords.txt");
-            
+
             // If --unlock was specified, run unlock after generation
             if let Some(drive) = unlock_drive {
                 unlock_drive_from_file(drive, None, true);
             }
         }
-        
+
         "unlock" => {
             if args.len() < 3 {
                 eprintln!("Error: No drive specified");
                 println!("\nUsage: bitunlocker unlock D:");
                 std::process::exit(1);
             }
-            
+
             let mut drive = &args[2];
             let mut passwords_file = None;
             let mut use_ps = true;
-            
+
             let mut i = 3;
             while i < args.len() {
                 if args[i] == "--passwords" && i + 1 < args.len() {
@@ -332,14 +355,14 @@ fn main() {
                     i += 1;
                 }
             }
-            
+
             unlock_drive_from_file(drive, passwords_file.map(|x| x.as_str()), use_ps);
         }
-        
+
         "help" | "-h" | "--help" => {
             print_usage();
         }
-        
+
         _ => {
             println!("Unknown command: {}", command);
             print_usage();
@@ -350,39 +373,5 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[test]
-    fn test_generate_combinations_empty() {
-        let result = generate_combinations(&[]);
-        assert_eq!(result, vec![""]);
-    }
-
-    #[test]
-    fn test_generate_combinations_single_list() {
-        let values = vec![vec!["a".to_string(), "b".to_string()]];
-        let result = generate_combinations(&values);
-        assert_eq!(result, vec!["a", "b"]);
-    }
-
-    #[test]
-    fn test_generate_combinations_two_lists() {
-        let values = vec![
-            vec!["a".to_string()],
-            vec!["1".to_string(), "2".to_string()],
-        ];
-        let result = generate_combinations(&values);
-        assert_eq!(result, vec!["a1", "a2"]);
-    }
-
-    #[test]
-    fn test_generate_combinations_three_lists() {
-        let values = vec![
-            vec!["pre".to_string()],
-            vec!["-".to_string()],
-            vec!["post".to_string()],
-        ];
-        let result = generate_combinations(&values);
-        assert_eq!(result, vec!["pre-post"]);
-    }
+    // Tests for main.rs functionality are minimal as core logic is in lib
 }

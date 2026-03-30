@@ -18,12 +18,13 @@ pub fn try_unlock_drive(drive: &str, password: &str) -> Result<bool, String> {
 
     // Parse error output for specific messages
     let stderr = String::from_utf8_lossy(&output.stderr);
-    
+
     // If it's not a success, check what the error says
     // Wrong password typically shows "BitLocker recovery key is incorrect"
-    if stderr.contains("recovery key is incorrect") 
+    if stderr.contains("recovery key is incorrect")
         || stderr.contains("incorrect password")
-        || stderr.contains("0x80070043") {
+        || stderr.contains("0x80070043")
+    {
         return Ok(false);
     }
 
@@ -58,7 +59,7 @@ try {{
         .map_err(|e| format!("Failed to run PowerShell: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    
+
     // powershell returns "SUCCESS" or "FAILED"
     Ok(stdout == "SUCCESS")
 }
@@ -71,16 +72,16 @@ pub fn brute_force_unlock(
 ) -> Result<Option<String>, String> {
     let total = passwords.len();
     println!("Attempting to unlock {} with {} passwords...", drive, total);
-    
+
     for (i, password) in passwords.iter().enumerate() {
         print!("[{}/{}] Trying: {} ... ", i + 1, total, &password);
-        
+
         let result = if use_ps {
             try_unlock_drive_ps(drive, password)
         } else {
             try_unlock_drive(drive, password)
         };
-        
+
         match result {
             Ok(true) => {
                 println!("\n✓ SUCCESS! Password found: {}", password);
@@ -95,7 +96,7 @@ pub fn brute_force_unlock(
             }
         }
     }
-    
+
     println!("\n✗ No valid password found in the list.");
     Ok(None)
 }

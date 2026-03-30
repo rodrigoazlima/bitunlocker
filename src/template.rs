@@ -14,7 +14,7 @@ pub fn parse_template(template: &str) -> Vec<TemplatePart> {
     let mut parts = Vec::new();
     let chars: Vec<char> = template.chars().collect();
     let mut i = 0;
-    
+
     while i < chars.len() {
         if chars[i] == '{' {
             // Find the closing brace
@@ -28,23 +28,23 @@ pub fn parse_template(template: &str) -> Vec<TemplatePart> {
                 }
                 j += 1;
             }
-            
+
             if depth == 0 {
                 let placeholder = template[i..j].to_string();
-                
+
                 // Parse placeholder content
                 let part = parse_placeholder(&placeholder);
                 if !part.kind.is_empty() {
                     parts.push(part);
                 }
             }
-            
+
             i = j;
         } else {
             i += 1;
         }
     }
-    
+
     parts
 }
 
@@ -57,10 +57,10 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
     let mut max_value = None;
     let mut leet_speak = false;
     let mut case_mode = "mixed".to_string();
-    
+
     // Remove braces
     let content = placeholder.trim_start_matches('{').trim_end_matches('}');
-    
+
     // If there are no key=value pairs, the entire content is the kind
     if !content.contains('=') {
         let trimmed = content.trim();
@@ -78,14 +78,14 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
             case_mode,
         };
     }
-    
+
     // Parse each key=value pair
     for part in content.split(',') {
         let key_val: Vec<&str> = part.splitn(2, '=').collect();
         if key_val.len() == 2 {
             let key = key_val[0].trim();
             let value = key_val[1].trim();
-            
+
             match key {
                 "word" | "month" | "number" => kind = key.to_string(),
                 "begin" | "beginValue" => begin_value = Some(value.to_string()),
@@ -96,14 +96,15 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
                 "case" => case_mode = value.to_lowercase(),
                 _ => {}
             }
-        } else if part.trim().contains("word") 
-            || part.trim().contains("month") 
+        } else if part.trim().contains("word")
+            || part.trim().contains("month")
             || part.trim().contains("number")
-            || part.trim().contains("year") {
+            || part.trim().contains("year")
+        {
             kind = part.trim().to_string();
         }
     }
-    
+
     TemplatePart {
         kind,
         begin_value,
@@ -123,7 +124,7 @@ mod tests {
     fn test_parse_template_simple() {
         let template = "{month}";
         let parts = parse_template(template);
-        
+
         assert_eq!(parts.len(), 1);
         assert_eq!(parts[0].kind, "month");
     }
@@ -132,7 +133,7 @@ mod tests {
     fn test_parse_template_with_min_max() {
         let template = "{number,min=001,max=333}";
         let parts = parse_template(template);
-        
+
         assert_eq!(parts.len(), 1);
         let part = &parts[0];
         assert_eq!(part.kind, "number");
@@ -144,7 +145,7 @@ mod tests {
     fn test_parse_template_with_prefix_suffix() {
         let template = "prefix{number,min=001,max=333}suffix";
         let parts = parse_template(template);
-        
+
         assert_eq!(parts.len(), 1);
         assert_eq!(parts[0].kind, "number");
     }
@@ -153,7 +154,7 @@ mod tests {
     fn test_parse_placeholder_with_all_options() {
         let placeholder = "{word,min=aaa,max=zzz,leetSpeak=true,case=all}";
         let part = parse_placeholder(placeholder);
-        
+
         assert_eq!(part.kind, "word");
         assert_eq!(part.min_value, Some("aaa".to_string()));
         assert_eq!(part.max_value, Some("zzz".to_string()));

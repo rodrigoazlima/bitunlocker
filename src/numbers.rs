@@ -5,12 +5,12 @@ use std::collections::HashSet;
 pub fn generate_number_range(begin: &str, end: &str) -> Vec<String> {
     let begin_val = begin.parse::<i64>().unwrap_or(0);
     let end_val = end.parse::<i64>().unwrap_or(0);
-    
+
     let mut numbers = Vec::new();
-    
+
     // Determine padding from the begin value (count digits including leading zeros)
     let padding = begin.len();
-    
+
     for i in begin_val..=end_val {
         let num_str = if padding > 0 {
             format!("{:0padding$}", i, padding = padding)
@@ -19,11 +19,11 @@ pub fn generate_number_range(begin: &str, end: &str) -> Vec<String> {
         };
         numbers.push(num_str);
     }
-    
+
     // Remove duplicates
     let mut seen = HashSet::new();
     numbers.retain(|n| seen.insert(n.clone()));
-    
+
     numbers
 }
 
