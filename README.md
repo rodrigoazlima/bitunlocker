@@ -6,7 +6,7 @@ A command-line tool for generating password variations to recover access to BitL
 
 - Full template-based password generation with customizable properties
 - Month range generation (begin-end)
-- Case variation control (lower/upper/mixed/all)
+- Case variation control (lower/upper/mixed/all/camel/snake/kebab/scream)
 - Leet-speak character substitutions (@, 1, !, $, etc.)
 - Number padding support (000-999 format)
 - Generate large password lists efficiently
@@ -47,7 +47,8 @@ Templates use placeholders with customizable properties:
 | `begin=name` | Start of month range (optional) | `begin=january` |
 | `end=name` | End of month range (optional) | `end=december` |
 | `leetSpeak=true\|false` | Enable leet-speak substitutions | `leetSpeak=false` |
-| `case=lower\|upper\|mixed\|all` | Case variation mode | `case=all` |
+| `case=lower\|upper\|mixed\|all\|camel\|snake\|kebab\|scream` | Case variation mode | `case=all` |
+| `sep=_` or `-` | Separator for snake/kebab case modes | `sep=_` |
 
 ### Commands
 
@@ -107,12 +108,49 @@ If your pendrive is at D: and uses BitLocker:
 
 3. Try each password against the D: drive using Windows recovery options
 
-## Template Examples
+## Case Variation Modes
 
-### Month Range with All Case Variations
+| Mode | Description | Example (from "april") |
+|------|-------------|------------------------|
+| `lower` | All lowercase | `april` |
+| `upper` | All uppercase | `APRIL` |
+| `mixed` | First letter uppercase, rest lowercase | `April` |
+| `all` | All 2^N combinations (uppercase/lowercase) | `aPrIl`, `ApRiL`, etc. |
+| `camel` | First lowercase, rest uppercase | `aPRIL` |
+| `snake` | Letters separated by underscores, all lowercase | `a_p_r_i_l` |
+| `kebab` | Letters separated by hyphens, all lowercase | `a-p-r-i-l` |
+| `scream` | Letters separated by underscores, all uppercase | `A_P_R_I_L` |
+
+### Template Examples
+
+#### Month Range with All Case Variations
 ```bash
 password-gen gen "{month,min=1,max=5,begin=january,end=december,case=all}Example{number,min=001,max=999}"
 ```
+
+#### Using camelCase mode
+```bash
+password-gen gen "{word,min=4,max=6,case=camel}Example{number,min=001,max=999}"
+```
+Generates: `aPRILExample001`, `mARChExample456`, etc.
+
+#### Using snake_case mode
+```bash
+password-gen gen "{word,min=4,max=6,case=snake}Example{number,min=001,max=999}"
+```
+Generates: `a_p_r_i_lExample001`, `m_a_r_c_hExample456`, etc.
+
+#### Using kebab-case mode
+```bash
+password-gen gen "{word,min=4,max=6,case=kebab}Example{number,min=001,max=999}"
+```
+Generates: `a-p-r-i-lExample001`, `m-a-r-c-hExample456`, etc.
+
+#### Using SCREAM_SNAKE_CASE mode
+```bash
+password-gen gen "{word,min=4,max=6,case=scream}Example{number,min=001,max=999}"
+```
+Generates: `A_P_R_I_LExample001`, `M_A_R_C_HExample456`, etc.
 
 ### With Leet-Speak Enabled
 ```bash

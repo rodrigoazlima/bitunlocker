@@ -19,4 +19,6 @@ pub use generator::{generate_combinations, generate_passwords_from_parts};
 pub use leet::{apply_leet_variations, get_leet_map};
 pub use numbers::generate_number_range;
 pub use template::{parse_placeholder, parse_template, TemplatePart};
-pub use unlock::{brute_force_unlock, print_unlock_report, try_unlock_drive, try_unlock_drive_ps, UnlockResult};
+pub use unlock::{
+    brute_force_unlock, print_unlock_report, try_unlock_drive, try_unlock_drive_ps, UnlockResult,
+};
