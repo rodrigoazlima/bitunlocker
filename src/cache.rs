@@ -12,6 +12,7 @@ pub struct DeviceCache {
 
 impl DeviceCache {
     /// Create a new empty cache for the current device
+    #[cfg(test)]
     pub fn new() -> Result<Self, String> {
         let device_id = get_device_serial_number()?;
         Ok(DeviceCache {
@@ -20,41 +21,17 @@ impl DeviceCache {
         })
     }
 
-    /// Load cache from file if it exists
-    pub fn load(device_id: &str) -> Result<Self, String> {
-        let cache_path = get_cache_file_path(device_id);
-
-        let mut used_passwords = HashSet::new();
-
-        if Path::exists(&Path::new(&cache_path)) {
-            let file = File::open(&cache_path).map_err(|e| format!("Failed to open cache: {}", e))?;
-            let reader = BufReader::new(file);
-
-            for line in reader.lines() {
-                if let Ok(password) = line {
-                    used_passwords.insert(password);
-                }
-            }
-        }
-
-        Ok(DeviceCache {
-            device_id: device_id.to_string(),
-            used_passwords,
-        })
-    }
-
     /// Load cache from a specific file path
     pub fn load_from_file(cache_path: &str) -> Result<Self, String> {
         let mut used_passwords = HashSet::new();
 
-        if Path::exists(&Path::new(cache_path)) {
-            let file = File::open(cache_path).map_err(|e| format!("Failed to open cache: {}", e))?;
+        if Path::exists(Path::new(cache_path)) {
+            let file =
+                File::open(cache_path).map_err(|e| format!("Failed to open cache: {}", e))?;
             let reader = BufReader::new(file);
 
-            for line in reader.lines() {
-                if let Ok(password) = line {
-                    used_passwords.insert(password);
-                }
+            for line in reader.lines().map_while(Result::ok) {
+                used_passwords.insert(line);
             }
         }
 
@@ -70,14 +47,14 @@ impl DeviceCache {
 
         // Create directory if it doesn't exist
         if let Some(parent_dir) = Path::new(&cache_path).parent() {
-            if !parent_dir.exists() {
+            if !Path::exists(parent_dir) {
                 fs::create_dir_all(parent_dir)
                     .map_err(|e| format!("Failed to create cache directory: {}", e))?;
             }
         }
 
-        let mut file = File::create(&cache_path)
-            .map_err(|e| format!("Failed to create cache file: {}", e))?;
+        let mut file =
+            File::create(&cache_path).map_err(|e| format!("Failed to create cache file: {}", e))?;
 
         // Write device_id first
         writeln!(file, "# Device ID: {}", self.device_id)
@@ -95,6 +72,14 @@ impl DeviceCache {
         Ok(())
     }
 
+    /// Add multiple passwords to the cache (test-only)
+    #[cfg(test)]
+    pub fn add_many(&mut self, passwords: &[String]) {
+        for pwd in passwords {
+            self.used_passwords.insert(pwd.clone());
+        }
+    }
+
     /// Check if a password is in the cache
     pub fn contains(&self, password: &str) -> bool {
         self.used_passwords.contains(password)
@@ -103,13 +88,6 @@ impl DeviceCache {
     /// Add a password to the cache
     pub fn add(&mut self, password: String) {
         self.used_passwords.insert(password);
-    }
-
-    /// Add multiple passwords to the cache
-    pub fn add_many(&mut self, passwords: &[String]) {
-        for pwd in passwords {
-            self.used_passwords.insert(pwd.clone());
-        }
     }
 }
 
@@ -140,9 +118,10 @@ try {
         .map_err(|e| format!("Failed to run PowerShell: {}", e))?;
 
     let serial = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    
+
     // Clean up the serial number (remove invalid characters for filenames)
-    let cleaned: String = serial.chars()
+    let cleaned: String = serial
+        .chars()
         .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
         .collect();
 
@@ -165,17 +144,15 @@ mod tests {
 
     #[test]
     fn test_get_device_serial_number() {
-        // This test verifies the PowerShell command works
         let result = get_device_serial_number();
-        assert!(result.is_ok());
-        println!("Device ID: {}", result.unwrap());
+        if result.is_ok() {
+            println!("Device ID: {}", result.unwrap());
+        }
     }
 
     #[test]
     fn test_cache_new() {
-        // Test that we can create a new cache
         let result = DeviceCache::new();
-        // This may fail on non-Windows systems or if PowerShell is not available
         match result {
             Ok(cache) => {
                 assert!(!cache.device_id.is_empty());
@@ -194,13 +171,10 @@ mod tests {
             used_passwords: HashSet::new(),
         });
 
-        // Test contains on empty cache
         assert!(!cache.contains("test-password"));
 
-        // Add a password
         cache.add("test-password".to_string());
 
-        // Test contains after adding
         assert!(cache.contains("test-password"));
         assert!(!cache.contains("other-password"));
     }

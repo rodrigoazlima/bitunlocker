@@ -1,10 +1,9 @@
 use std::collections::HashSet;
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
-use std::path::Path;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::process::Command;
 
-use crate::cache::{get_device_serial_number, get_cache_file_path};
+use crate::cache::{get_cache_file_path, get_device_serial_number, DeviceCache};
 
 /// Result structure for unlock operations
 pub struct UnlockResult {
@@ -27,18 +26,13 @@ impl UnlockResult {
     }
 
     /// Create a new UnlockResult with pre-allocated capacity for successful passwords
-    #[allow(dead_code)]
-    pub fn with_capacity(_capacity: usize) -> Self {
+    #[cfg(test)]
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
             total_tested: 0,
-            successful_passwords: Vec::with_capacity(10), // Pre-allocate for expected successes
+            successful_passwords: Vec::with_capacity(capacity),
             cache_file: None,
         }
-    }
-
-    /// Save the cache file if a cache was used during this session
-    pub fn save_cache(&self) -> Result<(), String> {
-        Ok(())
     }
 }
 
@@ -133,40 +127,75 @@ pub fn brute_force_unlock(
     stop_after_first: bool,
     use_cache: bool,
 ) -> Result<UnlockResult, String> {
-    let unlock_fn = if use_ps { try_unlock_drive_ps } else { try_unlock_drive };
+    let unlock_fn = if use_ps {
+        try_unlock_drive_ps
+    } else {
+        try_unlock_drive
+    };
 
     // If cache is disabled, skip all cache logic
     if !use_cache {
-        return brute_force_unlock_with_callback(drive, passwords, unlock_fn, stop_after_first, None);
+        return brute_force_unlock_with_callback(
+            drive,
+            passwords,
+            unlock_fn,
+            stop_after_first,
+            None,
+        );
     }
-    
+
     // Get cache file path for this device
     let device_id = get_device_serial_number().unwrap_or_else(|_| "unknown".to_string());
     let cache_path = get_cache_file_path(&device_id);
-    
-    // Load existing cache if available
-    let mut cache_used_passwords: HashSet<String> = HashSet::new();
-    if Path::exists(&Path::new(&cache_path)) {
-        if let Ok(file) = File::open(&cache_path) {
-            let reader = BufReader::new(file);
-            for line in reader.lines() {
-                if let Ok(password) = line {
-                    cache_used_passwords.insert(password);
-                }
-            }
-        }
-    }
+
+    // Load existing cache if available, or create new one
+    let cache = DeviceCache::load_from_file(&cache_path).ok();
 
     // Filter out passwords already in cache
     let mut passwords_to_test: Vec<String> = Vec::new();
-    
+    let mut cached_count = 0;
+
     for password in passwords {
-        if !cache_used_passwords.contains(&password) {
-            passwords_to_test.push(password);
+        if let Some(ref c) = cache {
+            if c.contains(&password) {
+                cached_count += 1;
+                continue;
+            }
         }
+        passwords_to_test.push(password);
     }
 
-    brute_force_unlock_with_callback(drive, passwords_to_test, unlock_fn, stop_after_first, Some(cache_path))
+    if cached_count > 0 {
+        println!(
+            "Skipping {} already-tested passwords from cache.",
+            cached_count
+        );
+    }
+
+    // Use the DeviceCache to track successful passwords during this session
+    let mut temp_cache = cache.unwrap_or_else(|| DeviceCache {
+        device_id: device_id.clone(),
+        used_passwords: HashSet::new(),
+    });
+
+    let result = brute_force_unlock_with_callback(
+        drive,
+        passwords_to_test,
+        unlock_fn,
+        stop_after_first,
+        Some(cache_path),
+    )?;
+
+    // Add successful passwords to temp cache and save
+    for pwd in &result.successful_passwords {
+        temp_cache.add(pwd.clone());
+    }
+
+    if !temp_cache.used_passwords.is_empty() {
+        let _ = temp_cache.save();
+    }
+
+    Ok(result)
 }
 
 /// Internal function that supports cache filtering
@@ -180,9 +209,13 @@ fn brute_force_unlock_with_callback(
     let total = passwords.len();
     println!("Attempting to unlock {} with {} passwords...", drive, total);
 
-    let mut result = UnlockResult::with_capacity(total.min(100));
+    let mut result = UnlockResult::new();
+    if cache_file.is_some() {
+        // Pre-allocate capacity when we have a cache file
+        result.successful_passwords.reserve(total.min(100));
+    }
     result.cache_file = cache_file;
-    
+
     for (i, password) in passwords.iter().enumerate() {
         print!("[{}/{}] Trying: {} ... ", i + 1, total, &password);
 
@@ -193,12 +226,12 @@ fn brute_force_unlock_with_callback(
                 println!("SUCCESS");
                 result.successful_passwords.push(password.clone());
                 result.total_tested += 1;
-                
+
                 // Add to cache
-                if let Some(ref cf) = result.cache_file {
+                if let Some(cf) = result.cache_file.as_deref() {
                     add_to_cache(cf, password.clone());
                 }
-                
+
                 if stop_after_first {
                     // Print report and return
                     print_unlock_report(&result, true);
@@ -226,7 +259,7 @@ fn brute_force_unlock_with_callback(
             result.successful_passwords.len()
         );
     }
-    
+
     print_unlock_report(&result, stop_after_first);
     Ok(result)
 }
@@ -234,7 +267,11 @@ fn brute_force_unlock_with_callback(
 /// Add a password to the cache file
 fn add_to_cache(cache_path: &str, password: String) {
     // Append to cache file
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(cache_path) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(cache_path)
+    {
         let _ = writeln!(file, "{}", password);
     }
 }
@@ -280,8 +317,12 @@ mod tests {
 
         assert_eq!(result.total_tested, 5);
         assert_eq!(result.successful_passwords.len(), 2);
-        assert!(result.successful_passwords.contains(&"password1".to_string()));
-        assert!(result.successful_passwords.contains(&"password2".to_string()));
+        assert!(result
+            .successful_passwords
+            .contains(&"password1".to_string()));
+        assert!(result
+            .successful_passwords
+            .contains(&"password2".to_string()));
     }
 
     #[test]
@@ -291,7 +332,7 @@ mod tests {
             successful_passwords: Vec::new(),
             cache_file: None,
         };
-        
+
         // Just verify the function doesn't panic - actual output goes to stdout
         print_unlock_report(&result, true);
     }
@@ -303,7 +344,7 @@ mod tests {
             successful_passwords: vec!["correct-password".to_string()],
             cache_file: None,
         };
-        
+
         // Just verify the function doesn't panic
         print_unlock_report(&result, false);
     }
@@ -342,7 +383,7 @@ mod tests {
 
         assert!(result.is_ok());
         let result = result.unwrap();
-        
+
         // Should have tested all 3 passwords
         assert_eq!(result.total_tested, 3);
     }
@@ -350,17 +391,14 @@ mod tests {
     #[test]
     fn test_brute_force_cache_disabled() {
         // Test that cache disabled works correctly
-        let passwords = vec![
-            "pwd1".to_string(),
-            "pwd2".to_string(),
-        ];
+        let passwords = vec!["pwd1".to_string(), "pwd2".to_string()];
 
         // With use_cache=false, should test all passwords
         let result = brute_force_unlock("D:", passwords, true, false, false);
 
         assert!(result.is_ok());
         let result = result.unwrap();
-        
+
         // Should have tested all 2 passwords
         assert_eq!(result.total_tested, 2);
     }
