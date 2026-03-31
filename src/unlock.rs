@@ -273,12 +273,112 @@ fn add_to_cache(cache_path: &str, password: String) {
     }
 }
 
+/// Mock unlock function for testing - always returns false (failed)
+#[allow(dead_code)]
+fn mock_unlock_fn_failed(_drive: &str, _password: &str) -> Result<bool, String> {
+    Ok(false)
+}
+
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use std::collections::HashSet;
 
     use super::*;
+
+    #[test]
+    fn test_brute_force_with_cached_password() {
+        // Test that cached passwords show "skipped (cached)" and don't count toward total_tested
+        let passwords = vec![
+            "new_password1".to_string(),
+            "cached_password".to_string(),
+            "new_password2".to_string(),
+        ];
+
+        // Create a cache with one password already tested
+        let mut cache = DeviceCache::new().unwrap_or_else(|_| DeviceCache {
+            device_id: "test-device".to_string(),
+            used_passwords: HashSet::new(),
+        });
+        cache.add("cached_password".to_string());
+
+        // Use mock function to avoid actual unlock attempts
+        let result = brute_force_unlock_with_callback(
+            "D:",
+            passwords,
+            mock_unlock_fn_failed,
+            false, // stop_after_first = false to test all
+            None,  // cache_file
+            Some(&cache),
+        );
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        // Only 2 new passwords should be tested (cached one skipped)
+        assert_eq!(result.total_tested, 2);
+    }
+
+    #[test]
+    fn test_brute_force_all_cached_passwords() {
+        // Test when all passwords are in cache - total_tested should be 0
+        let passwords = vec![
+            "cached1".to_string(),
+            "cached2".to_string(),
+            "cached3".to_string(),
+        ];
+
+        let mut cache = DeviceCache::new().unwrap_or_else(|_| DeviceCache {
+            device_id: "test-device".to_string(),
+            used_passwords: HashSet::new(),
+        });
+        cache.add("cached1".to_string());
+        cache.add("cached2".to_string());
+        cache.add("cached3".to_string());
+
+        let result = brute_force_unlock_with_callback(
+            "D:",
+            passwords,
+            mock_unlock_fn_failed,
+            false,
+            None,
+            Some(&cache),
+        );
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        // All 3 passwords should be skipped, total_tested should be 0
+        assert_eq!(result.total_tested, 0);
+        assert!(result.successful_passwords.is_empty());
+    }
+
+    #[test]
+    fn test_brute_force_no_cached_passwords() {
+        // Test when no passwords are in cache - all should be tested
+        let passwords = vec![
+            "new1".to_string(),
+            "new2".to_string(),
+        ];
+
+        // Empty cache
+        let cache = DeviceCache::new().unwrap_or_else(|_| DeviceCache {
+            device_id: "test-device".to_string(),
+            used_passwords: HashSet::new(),
+        });
+
+        let result = brute_force_unlock_with_callback(
+            "D:",
+            passwords,
+            mock_unlock_fn_failed,
+            false,
+            None,
+            Some(&cache),
+        );
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        // All 2 passwords should be tested
+        assert_eq!(result.total_tested, 2);
+    }
 
     #[test]
     fn test_try_unlock_with_empty_password() {
