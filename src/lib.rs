@@ -10,6 +10,7 @@ pub mod months;
 pub mod numbers;
 pub mod template;
 pub mod unlock;
+pub mod words;
 
 // Re-export commonly used functions from the main module
 // Removed generate_month_range re-export as it's unused
@@ -22,3 +23,4 @@ pub use template::{parse_placeholder, parse_template, TemplatePart};
 pub use unlock::{
     brute_force_unlock, print_unlock_report, try_unlock_drive, try_unlock_drive_ps, UnlockResult,
 };
+pub use words::{generate_extended, generate_shortened};

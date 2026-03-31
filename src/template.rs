@@ -65,7 +65,7 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
     if !content.contains('=') {
         let trimmed = content.trim();
         match trimmed {
-            "word" | "month" | "number" => kind = trimmed.to_string(),
+            "word" | "month" | "number" | "shortened" | "extended" => kind = trimmed.to_string(),
             _ => {}
         }
         return TemplatePart {
@@ -87,7 +87,7 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
             let value = key_val[1].trim();
 
             match key {
-                "word" | "month" | "number" => kind = key.to_string(),
+                "word" | "month" | "number" | "shortened" | "extended" => kind = key.to_string(),
                 "begin" | "beginValue" => begin_value = Some(value.to_string()),
                 "end" | "endValue" => end_value = Some(value.to_string()),
                 "min" | "minValue" => min_value = Some(value.to_string()),
@@ -100,6 +100,8 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
             || part.trim().contains("month")
             || part.trim().contains("number")
             || part.trim().contains("year")
+            || part.trim().contains("shortened")
+            || part.trim().contains("extended")
         {
             kind = part.trim().to_string();
         }
@@ -160,5 +162,23 @@ mod tests {
         assert_eq!(part.max_value, Some("zzz".to_string()));
         assert!(part.leet_speak);
         assert_eq!(part.case_mode, "all");
+    }
+
+    #[test]
+    fn test_parse_placeholder_shortened() {
+        let placeholder = "{shortened,min=3}";
+        let part = parse_placeholder(placeholder);
+
+        assert_eq!(part.kind, "shortened");
+        assert_eq!(part.min_value, Some("3".to_string()));
+    }
+
+    #[test]
+    fn test_parse_placeholder_extended() {
+        let placeholder = "{extended,max=10}";
+        let part = parse_placeholder(placeholder);
+
+        assert_eq!(part.kind, "extended");
+        assert_eq!(part.max_value, Some("10".to_string()));
     }
 }

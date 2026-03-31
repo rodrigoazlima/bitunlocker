@@ -9,6 +9,7 @@ mod months;
 mod numbers;
 mod template;
 mod unlock;
+mod words;
 
 use crate::{
     template::parse_template,
@@ -30,6 +31,8 @@ fn print_usage() {
     println!("  {{number,min=X,max=Y}} - Number range with optional padding");
     println!("  {{word,min=X,max=Y}}   - Word value or range");
     println!("  {{month}}              - Month names (january-december)");
+    println!("  {{shortened,min=L}}    - Shortened versions of a word (min=length to keep)");
+    println!("  {{extended,max=L}}     - Extended versions of a word (max=total length limit)");
     println!("\nOptions:");
     println!("  --unlock D:           Attempt to unlock drive after generation");
     println!("  --passwords <file>    Use custom password file for unlock");
@@ -38,6 +41,8 @@ fn print_usage() {
     println!("\nExamples:");
     println!("  bitunlocker gen \"pass{{number,min=001,max=333}}\" --unlock D:");
     println!("  bitunlocker gen \"{{word}}{{year,min=1990,max=2030}}\"");
+    println!("  bitunlocker gen \"{{shortened,min=3,max=6}}\" - shortened versions with min length");
+    println!("  bitunlocker gen \"{{extended,max=10}}\" - extended versions with max length");
     println!("  bitunlocker unlock D: --passwords my_passwords.txt");
     println!("  bitunlocker unlock D: --no-cache"); // Disable cache
 }
@@ -187,6 +192,73 @@ pub fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> 
         }
         "word" => {
             vec!["".to_string()]
+        }
+        "shortened" => {
+            // Get the source word from begin_value or min_value (as alphabetic word)
+            let source_word = part.begin_value.as_deref()
+                .or_else(|| {
+                    part.min_value.as_deref().filter(|v| v.chars().all(|c| c.is_alphabetic()))
+                })
+                .unwrap_or("");
+            
+            if source_word.is_empty() {
+                return vec![];
+            }
+            
+            // Determine minimum length from min_value or default to 1
+            let min_length = part.min_value.as_ref()
+                .and_then(|v| v.parse::<usize>().ok())
+                .map(|min_len| min_len.min(source_word.len()))
+                .unwrap_or(1);
+
+            let shortened = crate::words::generate_shortened(source_word, min_length);
+            
+            // Apply case variations to each shortened word
+            let mut results = Vec::new();
+            for word in &shortened {
+                let cases = crate::case::generate_case_variations(word, &part.case_mode);
+                if part.leet_speak {
+                    for case_str in cases {
+                        let leet_cases =
+                            crate::leet::apply_leet_variations(&case_str, &crate::leet::get_leet_map());
+                        results.extend(leet_cases);
+                    }
+                } else {
+                    results.extend(cases);
+                }
+            }
+            results
+        }
+        "extended" => {
+            // Get the source word from min_value or default to empty string
+            let source_word = part.min_value.as_deref().unwrap_or("");
+            
+            // Determine maximum length (default to source_word.len() + 2)
+            let max_length = part.max_value.as_ref()
+                .and_then(|v| v.parse::<usize>().ok())
+                .map(|max_len| max_len.max(source_word.len()))
+                .unwrap_or_else(|| {
+                    // Default: extend up to 10 chars or source length + 2, whichever is larger
+                    source_word.len().saturating_add(2).max(10)
+                });
+
+            let extended = crate::words::generate_extended(source_word, max_length);
+            
+            // Apply case variations to each extended word
+            let mut results = Vec::new();
+            for word in &extended {
+                let cases = crate::case::generate_case_variations(word, &part.case_mode);
+                if part.leet_speak {
+                    for case_str in cases {
+                        let leet_cases =
+                            crate::leet::apply_leet_variations(&case_str, &crate::leet::get_leet_map());
+                        results.extend(leet_cases);
+                    }
+                } else {
+                    results.extend(cases);
+                }
+            }
+            results
         }
         "month" => {
             let all_months = crate::months::get_month_order();

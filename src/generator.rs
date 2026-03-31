@@ -50,6 +50,77 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
             }
             results
         }
+        "shortened" => {
+            // Get the source word from min_value (as max_length) or use default
+            // The actual word to shorten should come from begin_value or a dedicated "word" param
+            
+            // First check if we have a word specified in begin_value
+            let source_word = part.begin_value.as_deref()
+                .or_else(|| {
+                    // If min_value has a non-numeric value, treat it as the source word
+                    part.min_value.as_deref().filter(|v| v.chars().all(|c| c.is_alphabetic()))
+                })
+                .unwrap_or("");
+            
+            if source_word.is_empty() {
+                return vec![];
+            }
+            
+            // Determine minimum length from min_value or default to 1
+            let min_length = part.min_value.as_ref()
+                .and_then(|v| v.parse::<usize>().ok())
+                .map(|min_len| min_len.min(source_word.len()))
+                .unwrap_or(1);
+
+            let shortened = crate::words::generate_shortened(source_word, min_length);
+            
+            // Apply case variations to each shortened word
+            let mut results = Vec::new();
+            for word in &shortened {
+                let cases = crate::case::generate_case_variations(word, &part.case_mode);
+                if part.leet_speak {
+                    for case in cases {
+                        let leet_cases =
+                            crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
+                        results.extend(leet_cases);
+                    }
+                } else {
+                    results.extend(cases);
+                }
+            }
+            results
+        }
+        "extended" => {
+            // Get the source word from min_value or default to empty string
+            let source_word = part.min_value.as_deref().unwrap_or("");
+            
+            // Determine maximum length (default to source_word.len() + 2)
+            let max_length = part.max_value.as_ref()
+                .and_then(|v| v.parse::<usize>().ok())
+                .map(|max_len| max_len.max(source_word.len()))
+                .unwrap_or_else(|| {
+                    // Default: extend up to 10 chars or source length + 2, whichever is larger
+                    source_word.len().saturating_add(2).max(10)
+                });
+
+            let extended = crate::words::generate_extended(source_word, max_length);
+            
+            // Apply case variations to each extended word
+            let mut results = Vec::new();
+            for word in &extended {
+                let cases = crate::case::generate_case_variations(word, &part.case_mode);
+                if part.leet_speak {
+                    for case_str in cases {
+                        let leet_cases =
+                            crate::leet::apply_leet_variations(&case_str, &crate::leet::get_leet_map());
+                        results.extend(leet_cases);
+                    }
+                } else {
+                    results.extend(cases);
+                }
+            }
+            results
+        }
         _ => {
             // Default: empty string for unknown types
             vec!["".to_string()]
