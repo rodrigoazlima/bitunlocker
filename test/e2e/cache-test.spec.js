@@ -14,9 +14,9 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Configuration
-const WORKSPACE_DIR = __dirname;
-const PASSWORD_GEN_CMD = 'password-gen.exe';
+// Configuration - Use two levels up to get to the release folder where password-gen.exe is located
+const WORKSPACE_DIR = path.resolve(__dirname, '..', '..');
+const PASSWORD_GEN_CMD = path.join(__dirname, '..', '..', 'password-gen.exe');
 const CACHE_FILE_PREFIX = '.bitunlocker-cache-';
 
 /**
@@ -47,6 +47,31 @@ function generatePasswords(passwordsCount = 10) {
     
     const cmd = `${PASSWORD_GEN_CMD} gen "${template}"`;
     execSync(cmd, { cwd: WORKSPACE_DIR });
+}
+
+/**
+ * Generate UUID-like passwords using unique number ranges
+ */
+function generateUUIDPasswords(passwordsCount = 20) {
+    // Use a wider range of numbers to simulate UUID-like uniqueness
+    const startNum = 1000;
+    const endNum = startNum + passwordsCount - 1;
+    const template = `Password{number,min=${startNum},max=${endNum}}`;
+    console.log(`Generating ${passwordsCount} UUID-like passwords with template: ${template}`);
+    
+    const cmd = `${PASSWORD_GEN_CMD} gen "${template}"`;
+    execSync(cmd, { cwd: WORKSPACE_DIR });
+}
+
+/**
+ * Read generated passwords from file and return array
+ */
+function getGeneratedPasswords() {
+    const genFile = path.join(WORKSPACE_DIR, 'generated_passwords.txt');
+    if (!fs.existsSync(genFile)) {
+        throw new Error('Generated passwords file not found');
+    }
+    return fs.readFileSync(genFile, 'utf-8').trim().split('\n');
 }
 
 /**
@@ -243,6 +268,122 @@ function testCachedPasswordSkipping() {
 }
 
 /**
+ * Test Suite 4: UUID Cache Persistence Test
+ * 
+ * Simulates cache persistence by:
+ * 1. Generating 20 unique passwords (10 in Group A, 10 in Group B)
+ * 2. First unlock tests all 20 passwords (none cached yet)
+ * 3. Second unlock with same passwords should skip the 10 that were "cached"
+ *    (we manually add them to cache since no successful unlocks occurred)
+ */
+function testUUIDCachePersistence() {
+    console.log('\n' + '='.repeat(70));
+    console.log('TEST SUITE 4: UUID Cache Persistence Test');
+    console.log('='.repeat(70));
+    
+    cleanupTestFiles();
+    
+    // Get the actual device ID
+    let deviceId;
+    try {
+        deviceId = execSync(
+            'powershell -NoProfile -ExecutionPolicy Bypass "Write-Output (Get-WmiObject -Class Win32_BIOS).SerialNumber"',
+            { cwd: WORKSPACE_DIR, encoding: 'utf-8' }
+        ).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    } catch {
+        deviceId = 'test_device_serial';
+    }
+    
+    const actualCachePath = path.join(WORKSPACE_DIR, `.bitunlocker-cache-${deviceId}.json`);
+    
+    // Step 1: Generate 20 UUID-like passwords
+    console.log('\n--- Step 1: Generate 20 UUID-like passwords ---');
+    generateUUIDPasswords(20);
+    
+    const genFile = path.join(WORKSPACE_DIR, 'generated_passwords.txt');
+    let allPasswords = fs.readFileSync(genFile, 'utf-8').trim().split('\n');
+    console.log(`Generated ${allPasswords.length} passwords`);
+    console.log('All passwords:', allPasswords);
+    
+    // Split into first 10 (Group A) and next 10 (Group B)
+    const groupA = allPasswords.slice(0, 10);  // First 10
+    const groupB = allPasswords.slice(10, 20); // Next 10
+    
+    console.log('\nGroup A (will be cached):', groupA.join(', '));
+    console.log('Group B (new passwords to test):', groupB.join(', '));
+    
+    // Step 2: Manually add Group A passwords to cache (simulating previous successful unlocks)
+    console.log('\n--- Step 2: Adding Group A to cache (simulating previous successful unlocks) ---');
+    const headerLine = `# Device ID: ${deviceId}`;
+    const cacheLines = [headerLine, ...groupA];
+    fs.writeFileSync(actualCachePath, cacheLines.join('\n') + '\n', 'utf-8');
+    console.log(`Created cache file with ${groupA.length} cached passwords`);
+    
+    // Step 3: Second unlock with all 20 passwords
+    // Group A should be skipped (cached), only Group B should be tested
+    console.log('\n--- Step 3: Unlock with all 20 passwords (Group A cached, Group B new) ---');
+    const output = unlockDrive(true);
+    
+    // Parse the output
+    const lines = output.split('\n');
+    let totalTested = 0;
+    let skippedCount = 0;
+    let testedPasswords = [];
+    
+    for (const line of lines) {
+        if (line.includes('... failed') || line.includes('... SUCCESS')) {
+            // Extract password from line like "[5/20] Trying: Password1014 ... failed"
+            const match = line.match(/Trying:\s+(\S+)\s+\.\.\./);
+            if (match) {
+                testedPasswords.push(match[1]);
+                totalTested++;
+            }
+        }
+        if (line.includes('(cached)')) {
+            skippedCount++;
+        }
+    }
+    
+    console.log(`\nResults:`);
+    console.log(`  Passwords tested: ${totalTested} (expected: 10 from Group B)`);
+    console.log(`  Cached passwords skipped: ${skippedCount} (expected: 10 from Group A)`);
+    console.log(`  Tested passwords:`, testedPasswords.join(', '));
+    
+    // Verify expected behavior
+    let allPass = true;
+    
+    if (totalTested !== 10) {
+        console.log(`✗ FAIL: Expected 10 passwords tested in second run, got ${totalTested}`);
+        allPass = false;
+    } else {
+        console.log('✓ PASS: Second unlock tested only 10 new passwords from Group B');
+    }
+    
+    if (skippedCount !== 10) {
+        console.log(`✗ FAIL: Expected 10 cached passwords skipped, got ${skippedCount}`);
+        allPass = false;
+    } else {
+        console.log('✓ PASS: 10 passwords from Group A were correctly skipped (cached)');
+    }
+    
+    // Verify all tested passwords are from Group B
+    const allFromGroupB = testedPasswords.every(pwd => groupB.includes(pwd));
+    if (!allFromGroupB) {
+        console.log('✗ FAIL: Some tested passwords were not from Group B');
+        allPass = false;
+    } else {
+        console.log('✓ PASS: All tested passwords were from Group B (new passwords)');
+    }
+    
+    // Cleanup
+    try { fs.unlinkSync(actualCachePath); } catch(e) {}
+    
+    if (!allPass) {
+        process.exit(1);
+    }
+}
+
+/**
  * Test Suite 3: Integration test - Bug scenario validation
  */
 function testBugScenario() {
@@ -297,9 +438,10 @@ function main() {
     console.log(`Working directory: ${WORKSPACE_DIR}`);
     
     try {
-        // Run all tests
+        // Run all tests in order
         testCacheBehavior();
         testCachedPasswordSkipping();
+        testUUIDCachePersistence();  // New UUID cache persistence test
         testBugScenario();
         
         console.log('\n' + '='.repeat(70));

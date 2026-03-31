@@ -7,13 +7,14 @@
     "example": "examples"
   },
   "scripts": {
-    "test": "node cache-test.spec.js"
+    "test": "node cache-test.spec.js",
+    "playwright:install": "playwright install"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@playwright/test@latest": "^1.50.0"
+    "@playwright/test": "^1.50.0"
   }
 }

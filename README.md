@@ -188,11 +188,46 @@ When enabled, the tool automatically generates common leet-speak variations:
 - `s` → $, 5
 - `t` → 7
 
-## Performance Notes
+## Testing
 
-- The output file can be very large (hundreds of thousands of passwords)
-- Use appropriate `min` and `max` values to limit the search space
-- The month range (`begin-end`) helps reduce unnecessary combinations
+The project includes an end-to-end test suite for validating cache functionality.
+
+### Test Location
+
+Tests are located in the `test/e2e/` folder.
+
+### Running Tests
+
+```bash
+cd test/e2e
+npm install
+npm test
+```
+
+### Test Coverage
+
+The integration tests validate:
+
+| Test | Description |
+|------|-------------|
+| **Cache File Creation** | Verifies no cache file created when using `--no-cache` flag |
+| **Cached Password Skipping** | Validates cached passwords show "(cached)" and are skipped |
+| **UUID Cache Persistence** | Tests that 10 cached passwords are skipped on second unlock with 20 total passwords |
+
+### Cache Functionality
+
+The tool uses a device-specific cache to track successfully unlocked passwords:
+
+- **Cache File Location**: `.bitunlocker-cache-<device_id>.json` in the current working directory
+- **Format**: One password per line, with `# Device ID: <serial>` header
+- **Behavior**: Cached passwords are skipped during subsequent unlock operations
+
+### Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `BITLOCKER_DRIVE` | Target drive path for BitLocker recovery | `D:\` |
+| `OUTPUT_PASSWORD_FILE` | Output file path for generated passwords | `C:\passwords.txt` |
 
 ## Author
 
