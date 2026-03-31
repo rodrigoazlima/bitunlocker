@@ -2,12 +2,6 @@
 .env
 .env.local
 *.env
-BITLOCKER_DRIVE.txt
-
-# Output Files (generated passwords can be large)
-generated_passwords.txt
-*.txt
-passwords_*.txt
 
 # Build artifacts
 target/
@@ -29,3 +23,13 @@ Thumbs.db
 
 # Binary output (can be rebuilt)
 target/release/password-gen.exe
+
+# Output Files (generated passwords can be large)
+generated_passwords.txt
+*.txt
+passwords_*.txt
+
+#Cache tmp file
+generated_passwords*
+BITLOCKER_DRIVE.txt
+.bitunlocker-cache*

@@ -141,6 +141,7 @@ pub fn brute_force_unlock(
             unlock_fn,
             stop_after_first,
             None,
+            None,
         );
     }
 
@@ -151,39 +152,19 @@ pub fn brute_force_unlock(
     // Load existing cache if available, or create new one
     let cache = DeviceCache::load_from_file(&cache_path).ok();
 
-    // Filter out passwords already in cache
-    let mut passwords_to_test: Vec<String> = Vec::new();
-    let mut cached_count = 0;
-
-    for password in passwords {
-        if let Some(ref c) = cache {
-            if c.contains(&password) {
-                cached_count += 1;
-                continue;
-            }
-        }
-        passwords_to_test.push(password);
-    }
-
-    if cached_count > 0 {
-        println!(
-            "Skipping {} already-tested passwords from cache.",
-            cached_count
-        );
-    }
-
     // Use the DeviceCache to track successful passwords during this session
-    let mut temp_cache = cache.unwrap_or_else(|| DeviceCache {
+    let mut temp_cache = cache.clone().unwrap_or_else(|| DeviceCache {
         device_id: device_id.clone(),
         used_passwords: HashSet::new(),
     });
 
     let result = brute_force_unlock_with_callback(
         drive,
-        passwords_to_test,
+        passwords,
         unlock_fn,
         stop_after_first,
         Some(cache_path),
+        cache.as_ref(),
     )?;
 
     // Add successful passwords to temp cache and save
@@ -205,6 +186,7 @@ fn brute_force_unlock_with_callback(
     unlock_fn: fn(&str, &str) -> Result<bool, String>,
     stop_after_first: bool,
     cache_file: Option<String>,
+    cache: Option<&DeviceCache>,
 ) -> Result<UnlockResult, String> {
     let total = passwords.len();
     println!("Attempting to unlock {} with {} passwords...", drive, total);
@@ -218,6 +200,14 @@ fn brute_force_unlock_with_callback(
 
     for (i, password) in passwords.iter().enumerate() {
         print!("[{}/{}] Trying: {} ... ", i + 1, total, &password);
+
+        // Check if password is in cache
+        if let Some(ref c) = cache {
+            if c.contains(password) {
+                println!("skipped (cached)");
+                continue;
+            }
+        }
 
         let unlock_result = unlock_fn(drive, password);
 
