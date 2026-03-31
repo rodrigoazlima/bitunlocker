@@ -5,6 +5,13 @@ use std::process::Command;
 
 use crate::cache::{get_cache_file_path, get_device_serial_number, DeviceCache};
 
+/// BitLocker brute-force unlocker for Windows. 
+// Tries recovery passwords via manage-bde.exe or PowerShell (Unlock-BitLocker). 
+// Includes per-device caching (by serial) to skip known passwords, progress reporting, 
+// and stop-after-first option. Uses UnlockResult for output. 
+// Windows-only, requires admin.
+// @author rodrigoazlima
+
 /// Result structure for unlock operations
 pub struct UnlockResult {
     /// Total number of passwords tested
