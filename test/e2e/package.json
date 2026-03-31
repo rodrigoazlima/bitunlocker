@@ -1,0 +1,19 @@
+{
+  "name": "release",
+  "version": "1.0.0",
+  "description": "A command-line tool for generating password variations to recover access to BitLocker-encrypted drives (pendrives, USB sticks) when the recovery key is partially known.",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "node cache-test.spec.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test@latest": "^1.50.0"
+  }
+}
