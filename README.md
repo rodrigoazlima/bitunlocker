@@ -9,6 +9,8 @@ A command-line tool for generating password variations to recover access to BitL
 - Case variation control (lower/upper/mixed/all/camel/snake/kebab/scream)
 - Leet-speak character substitutions (@, 1, !, $, etc.)
 - Number padding support (000-999 format)
+- Shortened placeholder - generate words with fewer characters by removing letters
+- Extended placeholder - generate words with more characters by adding duplicates or new letters
 - Generate large password lists efficiently
 
 ## Installation
@@ -42,9 +44,9 @@ Templates use placeholders with customizable properties:
 
 | Property | Description | Example |
 |----------|-------------|---------|
-| `min=X` | Minimum value for number/word range | `min=001` |
-| `max=Y` | Maximum value for number/word range | `max=333` |
-| `begin=name` | Start of month range (optional) | `begin=january` |
+| `min=X` | Minimum value for number/word range, or minimum length for shortened | `min=001` or `min=3` |
+| `max=Y` | Maximum value for number/word range, or maximum length for extended | `max=333` or `max=10` |
+| `begin=name` | Start of month range or source word for shortened/extended | `begin=january` or `begin=august` |
 | `end=name` | End of month range (optional) | `end=december` |
 | `leetSpeak=true\|false` | Enable leet-speak substitutions | `leetSpeak=false` |
 | `case=lower\|upper\|mixed\|all\|camel\|snake\|kebab\|scream` | Case variation mode | `case=all` |
@@ -80,6 +82,81 @@ password-gen gen "{word}Example{number,min=001,max=999}"
 ```
 
 Output is saved to `generated_passwords.txt`.
+
+## Shortened and Extended Placeholders
+
+The shortened placeholder generates words by removing characters from the source word. The extended placeholder generates words by adding duplicate or new characters.
+
+### Shortened Placeholder `{shortened}`
+
+Generates all possible subsequences (combinations of characters in order) with a minimum length specified.
+
+**Properties:**
+- `min=X` - Minimum length of generated words (default: 1)
+- `begin=word` - Source word to shorten from
+
+**Examples:**
+
+```bash
+# Shortened versions of "august" with at least 3 characters
+password-gen gen "{shortened,begin=august,min=3}"
+```
+
+This generates all combinations like:
+- `aug`, `auu`, `aus`, `aut`, `agu`, `agt`, `gut`
+- `augu`, `augs`, `augt`, `auus`, `augs`, ...
+- `augst`, `auust`, `augus`, `augut`, `augst`, `august`
+
+**For "august" (6 chars) with min=3:**
+- `augst` - original without the second 'u'
+- `auust` - original without the 'g'  
+- `augus` - original without the 't'
+- And many more combinations...
+
+```bash
+# With case variations and leet-speak
+password-gen gen "{shortened,begin=august,min=3,case=all,leetSpeak=true}"
+```
+
+### Extended Placeholder `{extended}`
+
+Generates words by adding duplicate characters or inserting new letters. The result is always longer than the source word.
+
+**Properties:**
+- `max=X` - Maximum length of generated words (default: source_length + 2)
+- `begin=word` - Source word to extend from
+
+**Examples:**
+
+```bash
+# Extended versions of "august" with max 10 characters
+password-gen gen "{extended,begin=august,max=10}"
+```
+
+This generates words like:
+- `aaugust`, `auugust`, `auggust`, `auguust`, `augusst`, `augustt`
+- `aAugust`, `AuGust`, `AUguSt`, etc. (with case variations)
+- With leet-speak: `@uu8ust`, `@ugU5t`, etc.
+
+```bash
+# Extended versions of "cat" with max 6 characters and all cases
+password-gen gen "{extended,begin=cat,max=6,case=all}"
+```
+
+### Using Shortened/Extended with Months
+
+Both placeholders work seamlessly with month names:
+
+```bash
+# Shortened versions of all months with at least 4 characters
+password-gen gen "{shortened,begin=february,min=4}Example{number,min=001,max=99}"
+
+# Extended versions of all months up to 12 characters
+password-gen gen "{extended,begin=december,max=12}Example{number,min=001,max=99}"
+
+# All case variations for shortened month names
+password-gen gen "{shortened,begin=april,min=3,case=all}"
+```
 
 ## Environment Variables
 

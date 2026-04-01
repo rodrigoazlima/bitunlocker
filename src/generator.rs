@@ -51,13 +51,9 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
             results
         }
         "shortened" => {
-            // Get the source word from min_value (as max_length) or use default
-            // The actual word to shorten should come from begin_value or a dedicated "word" param
-            
-            // First check if we have a word specified in begin_value
+            // Get the source word from begin_value or min_value (alphabetic)
             let source_word = part.begin_value.as_deref()
                 .or_else(|| {
-                    // If min_value has a non-numeric value, treat it as the source word
                     part.min_value.as_deref().filter(|v| v.chars().all(|c| c.is_alphabetic()))
                 })
                 .unwrap_or("");
@@ -91,10 +87,18 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
             results
         }
         "extended" => {
-            // Get the source word from min_value or default to empty string
-            let source_word = part.min_value.as_deref().unwrap_or("");
+            // Get the source word from begin_value or min_value (alphabetic)
+            let source_word = part.begin_value.as_deref()
+                .or_else(|| {
+                    part.min_value.as_deref().filter(|v| v.chars().all(|c| c.is_alphabetic()))
+                })
+                .unwrap_or("");
             
-            // Determine maximum length (default to source_word.len() + 2)
+            if source_word.is_empty() {
+                return vec![];
+            }
+            
+            // Determine maximum length from max_value or default to source_word.len() + 2
             let max_length = part.max_value.as_ref()
                 .and_then(|v| v.parse::<usize>().ok())
                 .map(|max_len| max_len.max(source_word.len()))
@@ -175,5 +179,117 @@ mod tests {
         assert!(results.contains(&"a2".to_string()));
         assert!(results.contains(&"b1".to_string()));
         assert!(results.contains(&"b2".to_string()));
+    }
+
+    #[test]
+    fn test_get_values_for_part_shortened_with_august() {
+        let part = crate::template::TemplatePart {
+            kind: "shortened".to_string(),
+            begin_value: Some("august".to_string()),
+            end_value: None,
+            min_value: Some("3".to_string()),
+            max_value: None,
+            leet_speak: false,
+            case_mode: "mixed".to_string(),
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        // Should include shortened versions of "august" with at least 3 chars
+        assert!(values.contains(&"aug".to_string()));
+        assert!(values.contains(&"augu".to_string()));
+        assert!(values.contains(&"augus".to_string()));
+        assert!(values.contains(&"august".to_string()));
+    }
+
+    #[test]
+    fn test_get_values_for_part_extended_with_august() {
+        let part = crate::template::TemplatePart {
+            kind: "extended".to_string(),
+            begin_value: Some("august".to_string()),
+            end_value: None,
+            min_value: None,
+            max_value: Some("10".to_string()),
+            leet_speak: false,
+            case_mode: "mixed".to_string(),
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        // Should include extended versions of "august" (more than 6 chars, up to 10)
+        assert!(values.iter().any(|v| v.len() > 6 && v.len() <= 10));
+    }
+
+    #[test]
+    fn test_get_values_for_part_shortened_with_case_all() {
+        let part = crate::template::TemplatePart {
+            kind: "shortened".to_string(),
+            begin_value: Some("august".to_string()),
+            end_value: None,
+            min_value: Some("3".to_string()),
+            max_value: None,
+            leet_speak: false,
+            case_mode: "all".to_string(),
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        // With case=all, should have all 2^N combinations
+        // For a 6-char word with at least 3 chars: should include many variations
+        assert!(values.iter().any(|v| v.contains("aug")));
+    }
+
+    #[test]
+    fn test_get_values_for_part_extended_with_case_all() {
+        let part = crate::template::TemplatePart {
+            kind: "extended".to_string(),
+            begin_value: Some("cat".to_string()),
+            end_value: None,
+            min_value: None,
+            max_value: Some("6".to_string()),
+            leet_speak: false,
+            case_mode: "all".to_string(),
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        // Should include extended versions with all case combinations
+        assert!(values.iter().any(|v| v.len() > 3 && v.len() <= 6));
+    }
+
+    #[test]
+    fn test_get_values_for_part_shortened_with_leet_speak() {
+        let part = crate::template::TemplatePart {
+            kind: "shortened".to_string(),
+            begin_value: Some("cat".to_string()),
+            end_value: None,
+            min_value: Some("2".to_string()),
+            max_value: None,
+            leet_speak: true,
+            case_mode: "mixed".to_string(),
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        // With leetSpeak, should include variations like "c@", "@t", etc.
+        assert!(values.iter().any(|v| v.contains("@")));
+    }
+
+    #[test]
+    fn test_get_values_for_part_extended_with_leet_speak() {
+        let part = crate::template::TemplatePart {
+            kind: "extended".to_string(),
+            begin_value: Some("cat".to_string()),
+            end_value: None,
+            min_value: None,
+            max_value: Some("6".to_string()),
+            leet_speak: true,
+            case_mode: "mixed".to_string(),
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        // Should include extended versions with leet-speak
+        assert!(values.iter().any(|v| v.len() > 3 && (v.contains("@") || v.contains("!"))));
     }
 }

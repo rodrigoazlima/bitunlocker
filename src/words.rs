@@ -241,4 +241,48 @@ mod tests {
         let has_extensions = result.iter().any(|w| w.len() > 4);
         assert!(has_extensions, "Expected at least one extended word");
     }
+
+    #[test]
+    fn test_generate_shortened_august_all_variations() {
+        // Test that all expected shortened variations of "august" are generated
+        let result = generate_shortened("august", 3);
+        
+        // Check for the examples from user's requirements:
+        // augst (removed second u), auust (removed g), augus, augu, aug
+        assert!(result.contains(&"augst".to_string()), "augst not found");
+        assert!(result.contains(&"auust".to_string()), "auust not found");
+        assert!(result.contains(&"augus".to_string()), "augus not found");
+        assert!(result.contains(&"augu".to_string()), "augu not found");
+        assert!(result.contains(&"aug".to_string()), "aug not found");
+        assert!(result.contains(&"auu".to_string()), "auu not found");
+        assert!(result.contains(&"ust".to_string()), "ust not found");
+    }
+
+    #[test]
+    fn test_generate_shortened_with_february() {
+        let result = generate_shortened("february", 4);
+        
+        // Should include shorter versions
+        assert!(result.iter().any(|v| v.len() >= 4 && v.len() <= 8));
+    }
+
+    #[test]
+    fn test_generate_extended_with_august_max_8() {
+        let result = generate_extended("august", 8);
+        
+        // Should produce words with 7-8 characters
+        assert!(result.iter().any(|v| v.len() == 7 || v.len() == 8));
+    }
+
+    #[test]
+    fn test_generate_shortened_with_june() {
+        let result = generate_shortened("june", 2);
+        
+        // Should include all 2-4 character subsequences
+        assert!(result.contains(&"jun".to_string()));
+        assert!(result.contains(&"jue".to_string()));
+        assert!(result.contains(&"jne".to_string()));
+        assert!(result.contains(&"une".to_string()));
+        assert!(result.contains(&"ue".to_string()));
+    }
 }
