@@ -17,6 +17,14 @@ pub fn generate_passwords_from_parts(parts: &[crate::template::TemplatePart]) ->
 fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
     match part.kind.as_str() {
         "number" => {
+            // Check if shortened is requested - number doesn't support shortened
+            let has_shortened = part.min_value.as_ref().is_some_and(|v| v == "shortened")
+                || part.max_value.as_ref().is_some_and(|v| v == "shortened");
+            
+            if has_shortened {
+                return vec!["Error: 'number' placeholder does not support 'shortened' modifier".to_string()];
+            }
+            
             if let (Some(begin), Some(end)) = (&part.min_value, &part.max_value) {
                 crate::numbers::generate_number_range(begin, end)
             } else {
@@ -33,22 +41,104 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
             }
         }
         "month" => {
-            let months = crate::months::get_month_order();
+            let all_months = crate::months::get_month_order();
+            
+            // Get begin and end indices for filtering
+            let mut start_idx = 0;
+            let mut end_idx = all_months.len() - 1;
+
+            if let Some(begin) = &part.begin_value {
+                if let Some(idx) = all_months
+                    .iter()
+                    .position(|m| m.to_lowercase() == begin.to_lowercase())
+                {
+                    start_idx = idx;
+                }
+            }
+
+            if let Some(end) = &part.end_value {
+                if let Some(idx) = all_months
+                    .iter()
+                    .position(|m| m.to_lowercase() == end.to_lowercase())
+                {
+                    end_idx = idx;
+                }
+            }
+
+            // Generate months in the range
             let mut results = Vec::new();
 
-            for month in &months {
-                let cases = crate::case::generate_case_variations(month, &part.case_mode);
-                for case in cases {
-                    if part.leet_speak {
-                        let leet_cases =
-                            crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
-                        results.extend(leet_cases);
-                    } else {
-                        results.push(case);
+            for month in &all_months[start_idx..=end_idx] {
+                // Check if shortened is requested - generate all subsequences of the month name
+                let has_shortened = part.min_value.as_ref().is_some_and(|v| v == "shortened")
+                    || part.max_value.as_ref().is_some_and(|v| v == "shortened");
+                
+                if has_shortened {
+                    // Generate all shortened versions using bitmask approach
+                    let chars: Vec<char> = month.chars().collect();
+                    let n = chars.len();
+                    
+                    for mask in 1..(1 << n) {  // Skip mask=0 (empty string)
+                        let mut current = String::new();
+                        for i in 0..n {
+                            if mask & (1 << i) != 0 {
+                                current.push(chars[i]);
+                            }
+                        }
+                        
+                        // Apply case variations
+                        let cases = crate::case::generate_case_variations(&current, &part.case_mode);
+                        if part.leet_speak {
+                            for case in cases {
+                                let leet_cases =
+                                    crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
+                                results.extend(leet_cases);
+                            }
+                        } else {
+                            results.extend(cases);
+                        }
+                    }
+                } else {
+                    // Regular month generation without shortened
+                    let cases = crate::case::generate_case_variations(month, &part.case_mode);
+                    
+                    for case in cases {
+                        if part.leet_speak {
+                            let leet_cases =
+                                crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
+                            results.extend(leet_cases);
+                        } else {
+                            results.push(case);
+                        }
                     }
                 }
             }
-            results
+
+            // If begin/end not found or invalid range, return all months
+            if results.is_empty() {
+                for month in &all_months {
+                    let cases = crate::case::generate_case_variations(month, &part.case_mode);
+                    
+                    for case in cases {
+                        if part.leet_speak {
+                            let leet_cases = crate::leet::apply_leet_variations(
+                                &case,
+                                &crate::leet::get_leet_map(),
+                            );
+                            results.extend(leet_cases);
+                        } else {
+                            results.push(case);
+                        }
+                    }
+                }
+            }
+
+            // Remove duplicates using HashSet (O(1) lookup)
+            let mut unique_results: Vec<String> = results.into_iter().collect();
+            unique_results.sort();
+            unique_results.dedup();
+            
+            unique_results
         }
         "shortened" => {
             // Get the source word from begin_value or min_value (alphabetic)

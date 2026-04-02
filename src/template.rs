@@ -48,73 +48,105 @@ pub fn parse_template(template: &str) -> Vec<TemplatePart> {
     parts
 }
 
+/// Structure to track parsed placeholder options
+struct PlaceholderOptions {
+    kind: String,
+    begin_value: Option<String>,
+    end_value: Option<String>,
+    min_value: Option<String>,
+    max_value: Option<String>,
+    leet_speak: bool,
+    case_mode: String,
+}
+
+impl PlaceholderOptions {
+    fn new() -> Self {
+        PlaceholderOptions {
+            kind: String::new(),
+            begin_value: None,
+            end_value: None,
+            min_value: None,
+            max_value: None,
+            leet_speak: false,
+            case_mode: "mixed".to_string(),
+        }
+    }
+}
+
 /// Parse a single placeholder like {number,min=001,max=333}
 pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
-    let mut kind = String::new();
-    let mut begin_value = None;
-    let mut end_value = None;
-    let mut min_value = None;
-    let mut max_value = None;
-    let mut leet_speak = false;
-    let mut case_mode = "mixed".to_string();
+    let mut opts = PlaceholderOptions::new();
 
     // Remove braces
     let content = placeholder.trim_start_matches('{').trim_end_matches('}');
-
+    
     // If there are no key=value pairs, the entire content is the kind
     if !content.contains('=') {
         let trimmed = content.trim();
         match trimmed {
-            "word" | "month" | "number" | "shortened" | "extended" => kind = trimmed.to_string(),
+            "word" | "month" | "number" | "shortened" | "extended" => opts.kind = trimmed.to_string(),
             _ => {}
         }
         return TemplatePart {
-            kind,
-            begin_value,
-            end_value,
-            min_value,
-            max_value,
-            leet_speak,
-            case_mode,
+            kind: opts.kind,
+            begin_value: None,
+            end_value: None,
+            min_value: None,
+            max_value: None,
+            leet_speak: false,
+            case_mode: "mixed".to_string(),
         };
     }
 
-    // Parse each key=value pair
+    // Parse each part (can be key=value or just a flag)
     for part in content.split(',') {
-        let key_val: Vec<&str> = part.splitn(2, '=').collect();
-        if key_val.len() == 2 {
-            let key = key_val[0].trim();
-            let value = key_val[1].trim();
+        let trimmed_part = part.trim();
+        
+        // Check if this is a key=value pair
+        if trimmed_part.contains('=') {
+            let key_val: Vec<&str> = trimmed_part.splitn(2, '=').collect();
+            if key_val.len() == 2 {
+                let key = key_val[0].trim();
+                let value = key_val[1].trim();
 
-            match key {
-                "word" | "month" | "number" | "shortened" | "extended" => kind = key.to_string(),
-                "begin" | "beginValue" => begin_value = Some(value.to_string()),
-                "end" | "endValue" => end_value = Some(value.to_string()),
-                "min" | "minValue" => min_value = Some(value.to_string()),
-                "max" | "maxValue" => max_value = Some(value.to_string()),
-                "leetSpeak" => leet_speak = value.to_lowercase() == "true",
-                "case" => case_mode = value.to_lowercase(),
+                match key {
+                    "word" | "month" | "number" | "shortened" | "extended" => {
+                        // Only set kind if not already set (first occurrence wins)
+                        if opts.kind.is_empty() {
+                            opts.kind = key.to_string();
+                        }
+                    }
+                    "begin" | "beginValue" => opts.begin_value = Some(value.to_string()),
+                    "end" | "endValue" => opts.end_value = Some(value.to_string()),
+                    "min" | "minValue" => opts.min_value = Some(value.to_string()),
+                    "max" | "maxValue" => opts.max_value = Some(value.to_string()),
+                    "leetSpeak" => opts.leet_speak = value.to_lowercase() == "true",
+                    "case" => opts.case_mode = value.to_lowercase(),
+                    _ => {}
+                }
+            }
+        } else {
+            // This is a flag without a value - check if it's one of our known flags
+            match trimmed_part {
+                // Only set as kind if not already set (first occurrence wins)
+                "shortened" | "extended" | "word" | "month" | "number" => {
+                    if opts.kind.is_empty() {
+                        opts.kind = trimmed_part.to_string();
+                    }
+                }
                 _ => {}
             }
-        } else if part.trim().contains("word")
-            || part.trim().contains("month")
-            || part.trim().contains("number")
-            || part.trim().contains("year")
-            || part.trim().contains("shortened")
-            || part.trim().contains("extended")
-        {
-            kind = part.trim().to_string();
         }
     }
 
     TemplatePart {
-        kind,
-        begin_value,
-        end_value,
-        min_value,
-        max_value,
-        leet_speak,
-        case_mode,
+        kind: opts.kind,
+        begin_value: opts.begin_value,
+        end_value: opts.end_value,
+        min_value: opts.min_value,
+        max_value: opts.max_value,
+        leet_speak: opts.leet_speak,
+        case_mode: opts.case_mode,
     }
 }
 
