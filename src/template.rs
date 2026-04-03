@@ -7,6 +7,7 @@ pub struct TemplatePart {
     pub max_value: Option<String>,
     pub leet_speak: bool,
     pub case_mode: String,
+    pub has_shortened_flag: bool,
 }
 
 /// Parse template like "prefix{number,min=001,max=333}suffix"
@@ -57,6 +58,7 @@ struct PlaceholderOptions {
     max_value: Option<String>,
     leet_speak: bool,
     case_mode: String,
+    has_shortened_flag: bool,
 }
 
 impl PlaceholderOptions {
@@ -69,6 +71,7 @@ impl PlaceholderOptions {
             max_value: None,
             leet_speak: false,
             case_mode: "mixed".to_string(),
+            has_shortened_flag: false,
         }
     }
 }
@@ -95,6 +98,7 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
             max_value: None,
             leet_speak: false,
             case_mode: "mixed".to_string(),
+            has_shortened_flag: opts.has_shortened_flag,
         };
     }
 
@@ -128,8 +132,16 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
         } else {
             // This is a flag without a value - check if it's one of our known flags
             match trimmed_part {
+                // Handle shortened flag
+                "shortened" => {
+                    opts.has_shortened_flag = true;
+                    // Only set as kind if not already set (first occurrence wins)
+                    if opts.kind.is_empty() {
+                        opts.kind = trimmed_part.to_string();
+                    }
+                }
                 // Only set as kind if not already set (first occurrence wins)
-                "shortened" | "extended" | "word" | "month" | "number" => {
+                "extended" | "word" | "month" | "number" => {
                     if opts.kind.is_empty() {
                         opts.kind = trimmed_part.to_string();
                     }
@@ -147,6 +159,7 @@ pub fn parse_placeholder(placeholder: &str) -> TemplatePart {
         max_value: opts.max_value,
         leet_speak: opts.leet_speak,
         case_mode: opts.case_mode,
+        has_shortened_flag: opts.has_shortened_flag,
     }
 }
 

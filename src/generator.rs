@@ -18,8 +18,7 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
     match part.kind.as_str() {
         "number" => {
             // Check if shortened is requested - number doesn't support shortened
-            let has_shortened = part.min_value.as_ref().is_some_and(|v| v == "shortened")
-                || part.max_value.as_ref().is_some_and(|v| v == "shortened");
+            let has_shortened = part.has_shortened_flag;
             
             if has_shortened {
                 return vec!["Error: 'number' placeholder does not support 'shortened' modifier".to_string()];
@@ -70,8 +69,7 @@ fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> {
 
             for month in &all_months[start_idx..=end_idx] {
                 // Check if shortened is requested - generate all subsequences of the month name
-                let has_shortened = part.min_value.as_ref().is_some_and(|v| v == "shortened")
-                    || part.max_value.as_ref().is_some_and(|v| v == "shortened");
+                let has_shortened = part.has_shortened_flag;
                 
                 if has_shortened {
                     // Generate all shortened versions using bitmask approach
@@ -281,6 +279,7 @@ mod tests {
             max_value: None,
             leet_speak: false,
             case_mode: "mixed".to_string(),
+            has_shortened_flag: false,
         };
         
         let values = get_values_for_part(&part);
@@ -302,6 +301,7 @@ mod tests {
             max_value: Some("10".to_string()),
             leet_speak: false,
             case_mode: "mixed".to_string(),
+            has_shortened_flag: false,
         };
         
         let values = get_values_for_part(&part);
@@ -320,6 +320,7 @@ mod tests {
             max_value: None,
             leet_speak: false,
             case_mode: "all".to_string(),
+            has_shortened_flag: false,
         };
         
         let values = get_values_for_part(&part);
@@ -339,6 +340,7 @@ mod tests {
             max_value: Some("6".to_string()),
             leet_speak: false,
             case_mode: "all".to_string(),
+            has_shortened_flag: false,
         };
         
         let values = get_values_for_part(&part);
@@ -357,12 +359,65 @@ mod tests {
             max_value: None,
             leet_speak: true,
             case_mode: "mixed".to_string(),
+            has_shortened_flag: false,
         };
         
         let values = get_values_for_part(&part);
         
         // With leetSpeak, should include variations like "c@", "@t", etc.
         assert!(values.iter().any(|v| v.contains("@")));
+    }
+
+    #[test]
+    fn test_get_values_for_part_month_with_shortened_lower() {
+        // Test the exact scenario from the failing e2e test: {month,begin=may,end=may,case=lower,shortened}
+        let part = crate::template::TemplatePart {
+            kind: "month".to_string(),
+            begin_value: Some("may".to_string()),
+            end_value: Some("may".to_string()),
+            min_value: None,
+            max_value: None,
+            leet_speak: false,
+            case_mode: "lower".to_string(),
+            has_shortened_flag: true,
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        println!("Generated {} values for may with shortened:", values.len());
+        for v in &values {
+            println!("  - {}", v);
+        }
+        
+        // For "may" (3 chars) with case=lower and shortened, we should have:
+        // m, a, y, ma, my, ay, may = 7 base forms, each lowercased
+        assert!(values.contains(&"m".to_string()), "Single char 'm' should be present");
+        assert!(values.contains(&"a".to_string()), "Single char 'a' should be present");
+        assert!(values.contains(&"y".to_string()), "Single char 'y' should be present");
+        assert!(values.contains(&"ma".to_string()), "Two chars 'ma' should be present");
+        assert!(values.contains(&"my".to_string()), "Two chars 'my' should be present - THIS IS THE FAILING CHECK");
+        assert!(values.contains(&"ay".to_string()), "Two chars 'ay' should be present");
+        assert!(values.contains(&"may".to_string()), "Full word 'may' should be present");
+    }
+
+    #[test]
+    fn test_get_values_for_part_number_with_shortened_should_error() {
+        let part = crate::template::TemplatePart {
+            kind: "number".to_string(),
+            begin_value: None,
+            end_value: None,
+            min_value: Some("0".to_string()),
+            max_value: Some("10".to_string()),
+            leet_speak: false,
+            case_mode: "mixed".to_string(),
+            has_shortened_flag: true,  // This should trigger the error
+        };
+        
+        let values = get_values_for_part(&part);
+        
+        // Should return error message when number has shortened flag
+        assert!(values.len() == 1);
+        assert!(values[0].contains("Error"));
     }
 
     #[test]
@@ -375,6 +430,7 @@ mod tests {
             max_value: Some("6".to_string()),
             leet_speak: true,
             case_mode: "mixed".to_string(),
+            has_shortened_flag: false,
         };
         
         let values = get_values_for_part(&part);

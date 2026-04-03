@@ -187,6 +187,13 @@ pub fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> 
 
     match part.kind.as_str() {
         "number" => {
+            // Check if shortened is requested - number doesn't support shortened
+            let has_shortened = part.has_shortened_flag;
+            
+            if has_shortened {
+                return vec!["Error: 'number' placeholder does not support 'shortened' modifier".to_string()];
+            }
+            
             // Default: generate 0-99
             crate::numbers::generate_number_range("0", "99")
         }
@@ -289,14 +296,45 @@ pub fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> 
             let mut results = Vec::new();
 
             for month in &all_months[start_idx..=end_idx] {
-                let cases = crate::case::generate_case_variations(month, &part.case_mode);
-                for case in cases {
-                    if part.leet_speak {
-                        let leet_cases =
-                            crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
-                        results.extend(leet_cases);
-                    } else {
-                        results.push(case);
+                // Check if shortened is requested - generate all subsequences of the month name
+                let has_shortened = part.has_shortened_flag;
+                
+                if has_shortened {
+                    // Generate all shortened versions using bitmask approach
+                    let chars: Vec<char> = month.chars().collect();
+                    let n = chars.len();
+                    
+                    for mask in 1..(1 << n) {  // Skip mask=0 (empty string)
+                        let mut current = String::new();
+                        for i in 0..n {
+                            if mask & (1 << i) != 0 {
+                                current.push(chars[i]);
+                            }
+                        }
+                        
+                        // Apply case variations
+                        let cases = crate::case::generate_case_variations(&current, &part.case_mode);
+                        if part.leet_speak {
+                            for case in cases {
+                                let leet_cases =
+                                    crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
+                                results.extend(leet_cases);
+                            }
+                        } else {
+                            results.extend(cases);
+                        }
+                    }
+                } else {
+                    // Regular month generation without shortened
+                    let cases = crate::case::generate_case_variations(month, &part.case_mode);
+                    for case in cases {
+                        if part.leet_speak {
+                            let leet_cases =
+                                crate::leet::apply_leet_variations(&case, &crate::leet::get_leet_map());
+                            results.extend(leet_cases);
+                        } else {
+                            results.push(case);
+                        }
                     }
                 }
             }
@@ -319,7 +357,12 @@ pub fn get_values_for_part(part: &crate::template::TemplatePart) -> Vec<String> 
                 }
             }
 
-            results
+            // Remove duplicates
+            let mut unique_results: Vec<String> = results.into_iter().collect();
+            unique_results.sort();
+            unique_results.dedup();
+            
+            unique_results
         }
         _ => {
             // Default: empty string for unknown types
